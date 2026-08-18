@@ -1,10 +1,6 @@
 name: research-source-sweep
 
 on:
-  pull_request:
-    paths:
-      - "registry/research.toml"
-      - ".github/workflows/research-source-sweep.yml"
   workflow_dispatch:
 
 jobs:
