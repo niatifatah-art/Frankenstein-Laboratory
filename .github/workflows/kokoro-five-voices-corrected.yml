@@ -1,0 +1,49 @@
+name: kokoro-five-voices-corrected
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/kokoro-five-voices-corrected.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CAST_TEXT: >-
+    I had a terrible idea. What if instead of choosing one text to speech model,
+    I just used all of them? So I made Frankenstein Laboratory. And somehow,
+    it already speaks.
+
+jobs:
+  cast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y espeak-ng
+      - run: python -m pip install --upgrade uv
+      - name: Render five voices with matching G2P
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/kokoro-corrected
+          specs=("bm_fable:b" "am_puck:a" "am_fenrir:a" "am_michael:a" "bm_george:b")
+          i=1
+          for spec in "${specs[@]}"; do
+            voice="${spec%%:*}"
+            lang="${spec##*:}"
+            uv run --project engines/kokoro python engines/kokoro/runner.py \
+              --voice "$voice" --language "$lang" --text "$CAST_TEXT" \
+              --output "outputs/kokoro-corrected/$(printf '%02d' "$i")-$voice.wav" \
+              > "outputs/kokoro-corrected/$(printf '%02d' "$i")-$voice.json"
+            i=$((i+1))
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cast-kokoro-5-corrected
+          path: outputs/kokoro-corrected/
+          if-no-files-found: error
