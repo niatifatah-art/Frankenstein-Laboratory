@@ -117,12 +117,27 @@ def _qualification_overrides(registry_path: Path) -> dict[str, dict[str, object]
     }
 
 
+def _static_registry_files(primary_path: Path) -> tuple[Path, ...]:
+    files = [primary_path]
+    research = primary_path.with_name("research.toml")
+    if research.exists():
+        files.append(research)
+    return tuple(files)
+
+
 def load_registry(path: Path | None = None) -> tuple[EngineRecord, ...]:
     registry_path = path or repository_root() / "registry" / "engines.toml"
-    data = tomllib.loads(registry_path.read_text(encoding="utf-8"))
     overrides = _qualification_overrides(registry_path)
+    raw_records: dict[str, dict[str, object]] = {}
+    for static_path in _static_registry_files(registry_path):
+        data = tomllib.loads(static_path.read_text(encoding="utf-8"))
+        for key, base_raw in data.get("engine", {}).items():
+            if key in raw_records:
+                raise ValueError(f"Duplicate engine key across registry files: {key}")
+            raw_records[key] = dict(base_raw)
+
     records = []
-    for key, base_raw in data.get("engine", {}).items():
+    for key, base_raw in raw_records.items():
         merged = dict(base_raw)
         merged.update(overrides.get(key, {}))
         records.append(_record_from_raw(key, merged))
@@ -132,7 +147,11 @@ def load_registry(path: Path | None = None) -> tuple[EngineRecord, ...]:
 def validate_registry(path: Path | None = None) -> tuple[str, ...]:
     errors: list[str] = []
     seen: set[str] = set()
-    for record in load_registry(path):
+    try:
+        records = load_registry(path)
+    except ValueError as exc:
+        return (str(exc),)
+    for record in records:
         if record.key in seen:
             errors.append(f"duplicate engine key: {record.key}")
         seen.add(record.key)
