@@ -1,0 +1,103 @@
+name: openvoice-component-capacity
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/openvoice-component-capacity.yml"
+  workflow_dispatch:
+
+jobs:
+  conversion-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: sudo apt-get update && sudo apt-get install -y espeak-ng unzip
+      - run: python -m pip install --upgrade uv
+      - name: Generate two controlled synthetic references
+        run: |
+          mkdir -p outputs
+          uv run --project engines/kokoro python engines/kokoro/runner.py \
+            --voice af_heart \
+            --text "This is the source synthetic voice created inside Frankenstein Laboratory." \
+            --output outputs/source.wav
+          uv run --project engines/kokoro python engines/kokoro/runner.py \
+            --voice am_michael \
+            --text "This is the target synthetic voice created inside Frankenstein Laboratory." \
+            --output outputs/target.wav
+      - name: Install pinned OpenVoice V2 source and checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch torchaudio
+          git clone https://github.com/myshell-ai/OpenVoice.git /tmp/OpenVoice
+          git -C /tmp/OpenVoice checkout 74a1d147b17a8c3092dd5430504bd83ef6c7eb23
+          python -m pip install -e /tmp/OpenVoice
+          curl -L --fail --retry 3 \
+            https://myshell-public-repo-host.s3.amazonaws.com/openvoice/checkpoints_v2_0417.zip \
+            -o /tmp/openvoice-v2.zip
+          unzip -q /tmp/openvoice-v2.zip -d /tmp/OpenVoice
+      - name: Attempt real tone-color conversion
+        shell: bash
+        run: |
+          set +e
+          python - <<'PY' > outputs/stdout.log 2> outputs/stderr.log
+          import json, time
+          from pathlib import Path
+          from openvoice.api import ToneColorConverter
+
+          root = Path('/tmp/OpenVoice/checkpoints_v2/converter')
+          started = time.perf_counter()
+          converter = ToneColorConverter(str(root / 'config.json'), device='cpu')
+          converter.load_ckpt(str(root / 'checkpoint.pth'))
+          load_seconds = time.perf_counter() - started
+          src = converter.extract_se('outputs/source.wav')
+          tgt = converter.extract_se('outputs/target.wav')
+          convert_started = time.perf_counter()
+          converter.convert(
+              audio_src_path='outputs/source.wav',
+              src_se=src,
+              tgt_se=tgt,
+              output_path='outputs/openvoice-converted.wav',
+              message='FrankensteinLab',
+          )
+          print(json.dumps({
+              'engine': 'openvoice_v2',
+              'model_load_seconds': load_seconds,
+              'conversion_seconds': time.perf_counter() - convert_started,
+              'source_revision': '74a1d147b17a8c3092dd5430504bd83ef6c7eb23',
+          }))
+          PY
+          code=$?
+          echo "$code" > outputs/exit-code.txt
+          exit 0
+      - name: Classify component result
+        run: |
+          python - <<'PY'
+          import json, wave
+          from pathlib import Path
+          root = Path('outputs')
+          code = int((root / 'exit-code.txt').read_text().strip())
+          wav = root / 'openvoice-converted.wav'
+          result = {'component': 'openvoice_v2', 'exit_code': code, 'status': 'failed'}
+          if code == 0 and wav.exists():
+              try:
+                  with wave.open(str(wav), 'rb') as w:
+                      result.update(sample_rate=w.getframerate(), frames=w.getnframes())
+                      if w.getframerate() > 0 and w.getnframes() > 1000:
+                          result['status'] = 'passed'
+              except wave.Error as exc:
+                  result['validation_error'] = str(exc)
+          result['stderr_tail'] = (root / 'stderr.log').read_text(errors='replace')[-4000:]
+          (root / 'capacity.json').write_text(json.dumps(result, indent=2))
+          print(json.dumps(result))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: openvoice-v2-component-capacity
+          path: outputs/
+          if-no-files-found: error
