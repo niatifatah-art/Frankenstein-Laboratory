@@ -77,10 +77,14 @@ def build_worker_command(
     key: str,
     *,
     text: str | None = None,
+    phonemes: str | None = None,
     output: Path | None = None,
     describe: bool = False,
     extra_args: list[str] | None = None,
 ) -> tuple[str, ...]:
+    if text is not None and phonemes is not None:
+        raise ValueError("Worker input must be text or raw phonemes, not both.")
+
     worker = get_worker(key)
     command = [
         _uv(),
@@ -94,9 +98,13 @@ def build_worker_command(
     if describe:
         command.append("--describe")
     else:
-        if text is None or output is None:
-            raise ValueError("text and output are required for synthesis")
-        command.extend(["--text", text, "--output", str(output)])
+        if output is None or (text is None and phonemes is None):
+            raise ValueError("text or phonemes plus output are required for synthesis")
+        if phonemes is not None:
+            command.extend(["--phonemes", phonemes])
+        else:
+            command.extend(["--text", text or ""])
+        command.extend(["--output", str(output)])
     if extra_args:
         command.extend(extra_args)
     return tuple(command)
@@ -120,6 +128,7 @@ def execute_worker(
     key: str,
     *,
     text: str | None = None,
+    phonemes: str | None = None,
     output: Path | None = None,
     describe: bool = False,
     extra_args: list[str] | None = None,
@@ -128,6 +137,7 @@ def execute_worker(
     command = build_worker_command(
         key,
         text=text,
+        phonemes=phonemes,
         output=output,
         describe=describe,
         extra_args=extra_args,
