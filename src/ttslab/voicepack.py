@@ -60,7 +60,7 @@ class VoicePack:
             _validate_relative_path(self.pronunciation_lexicon)
 
     @classmethod
-    def load(cls, root: Path) -> "VoicePack":
+    def load(cls, root: Path) -> VoicePack:
         raw = json.loads((root / "voicepack.json").read_text(encoding="utf-8"))
         return cls(
             voice_id=raw["voice_id"],
