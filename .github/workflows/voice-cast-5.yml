@@ -1,0 +1,59 @@
+name: voice-cast-5
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/voice-cast-5.yml"
+  workflow_dispatch:
+
+jobs:
+  cast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system runtime
+        run: sudo apt-get update && sudo apt-get install -y espeak-ng
+
+      - name: Install uv
+        run: python -m pip install --upgrade uv
+
+      - name: Generate five male voice candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/voice-cast
+          TEXT="I've always wanted to make my first video, and honestly, I still have no idea what I'm doing. I'm learning, building weird things, breaking half of them, and somehow making the other half work. So this is me finally starting. Let's see how far this ridiculous experiment can go."
+
+          uv run --project engines/kokoro python engines/kokoro/runner.py --voice am_puck --text "$TEXT" --output outputs/voice-cast/01-am-puck.wav
+          uv run --project engines/kokoro python engines/kokoro/runner.py --voice am_fenrir --text "$TEXT" --output outputs/voice-cast/02-am-fenrir.wav
+          uv run --project engines/kokoro python engines/kokoro/runner.py --voice am_michael --text "$TEXT" --output outputs/voice-cast/03-am-michael.wav
+          uv run --project engines/kokoro python engines/kokoro/runner.py --voice bm_fable --text "$TEXT" --output outputs/voice-cast/04-bm-fable.wav
+          uv run --project engines/kokoro python engines/kokoro/runner.py --voice bm_george --text "$TEXT" --output outputs/voice-cast/05-bm-george.wav
+
+      - name: Validate samples
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import wave
+
+          root = Path('outputs/voice-cast')
+          files = sorted(root.glob('*.wav'))
+          assert len(files) == 5, files
+          for path in files:
+              assert path.stat().st_size > 1000
+              with wave.open(str(path), 'rb') as wav:
+                  assert wav.getframerate() == 24000
+                  assert wav.getnframes() > 2400
+                  print(path.name, round(wav.getnframes() / wav.getframerate(), 3), 's')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voice-cast-5-kokoro
+          path: outputs/voice-cast/*.wav
+          if-no-files-found: error
