@@ -49,7 +49,7 @@ class PronunciationLexicon:
         self.entries = tuple(entries)
 
     @classmethod
-    def from_json(cls, path: Path) -> "PronunciationLexicon":
+    def from_json(cls, path: Path) -> PronunciationLexicon:
         raw = json.loads(path.read_text(encoding="utf-8"))
         if raw.get("schema_version") != 1:
             raise ValueError("Unsupported pronunciation lexicon schema.")
