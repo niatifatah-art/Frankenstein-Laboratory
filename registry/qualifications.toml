@@ -71,6 +71,15 @@ artifact_digest = "sha256:3fc2e9266daede731d97a4a682fa0176620a181cfa5cc63188a6da
 hardware = ["cpu", "cuda_recommended"]
 notes = "Qualified on GitHub Ubuntu CPU with CPU-only PyTorch and load_denoiser=false. Model snapshot 32279effe8c19989596f05d353d1447f51d9e915. 5.28 s PCM/48 kHz audio; load 48.86 s; generation 28.58 s; generation RTF 5.41."
 
+[qualification.melotts]
+integration_status = "ready"
+source_revision = "209145371cff8fc3bd60d7be902ea69cbdb7965a"
+qualification_run = 32183148056
+artifact_id = 9341509133
+artifact_digest = "sha256:462fc9692271643db6812f76cb97ebbaa21083b22e366e5b710a7d1981b7942f"
+hardware = ["cpu", "cuda"]
+notes = "Qualified English synthesis on GitHub Ubuntu CPU after isolating legacy compatibility: setuptools<81, NLTK 3.8.1, CPU PyTorch, and UniDic path redirected to bundled unidic-lite. 4.659 s PCM/44.1 kHz audio; load 5.18 s; generation 5.80 s; generation RTF 1.245."
+
 [qualification.cosyvoice3]
 integration_status = "install_verified"
 source_revision = "074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc"
