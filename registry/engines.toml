@@ -1,65 +1,371 @@
 # Machine-readable provenance/integration registry.
-# "verified" here means the named source was checked at the recorded upstream.
-# Code, model-weight, dataset, and voice-asset licensing remain separate concerns.
+# Code, model weights, datasets and voice assets are deliberately tracked separately.
+# "ready" means a real synthesis run passed through our isolated worker and produced validated audio.
 
 [engine.kokoro]
 name = "Kokoro"
+family = "Kokoro"
+kind = "tts"
+version = "0.9.4"
 upstream = "https://github.com/hexgrad/kokoro"
 zone = "runtime"
 integration_status = "ready"
 code_license = "Apache-2.0"
 weights_license = "Apache-2.0"
 license_status = "partially_verified"
+commercial_use = "allowed_with_attribution"
+attribution = "Preserve Apache-2.0 license and notices when redistributing applicable material."
+dataset_notes = "Training-data provenance still requires separate review."
+verified_on = "2026-08-18"
 worker = "kokoro"
-notes = "82M lightweight backend. Two real-model CPU smoke runs passed on GitHub Ubuntu; dataset/provenance review remains separate from code/weights licensing."
+capabilities = ["cpu", "streaming", "phoneme_input"]
+languages = ["en", "es", "fr", "hi", "it", "ja", "pt", "zh"]
+hardware = ["cpu", "mps"]
+restrictions = []
+notes = "82M lightweight backend. Two real-model CPU smoke runs passed on GitHub Ubuntu."
 
 [engine.pocket_tts]
 name = "Pocket TTS"
+family = "Pocket TTS"
+kind = "tts"
+version = "2.1.0"
 upstream = "https://github.com/kyutai-labs/pocket-tts"
 zone = "runtime"
 integration_status = "ready"
 code_license = "MIT"
 weights_license = "CC-BY-4.0"
 license_status = "partially_verified"
+commercial_use = "allowed_with_attribution"
+attribution = "CC-BY-4.0 attribution for weights; voice assets have their own licenses."
+dataset_notes = "Voice catalog provenance and per-voice licenses are separate from model weights."
+verified_on = "2026-08-18"
 worker = "pocket_tts"
-notes = "2.1.0 CPU-first streaming backend. Real-model smoke passed with predefined Alba voice. Model weights carry acceptable-use terms; voice assets have separate per-source licenses."
+capabilities = ["cpu", "streaming", "voice_cloning", "long_form"]
+languages = ["en", "fr", "de", "pt", "it", "es"]
+hardware = ["cpu", "cuda_optional"]
+restrictions = ["Full voice-cloning weights are access-gated upstream."]
+notes = "CPU-first streaming backend. Real-model smoke passed with predefined Alba voice."
 
 [engine.chatterbox]
-name = "Chatterbox"
+name = "Chatterbox family"
+family = "Chatterbox"
+kind = "family"
+version = "0.1.7"
 upstream = "https://github.com/resemble-ai/chatterbox"
 zone = "runtime"
 integration_status = "planned"
 code_license = "MIT"
-weights_license = "unknown"
-license_status = "partially_verified"
-notes = "Family includes Nano/Turbo/Multilingual V3; verify each model card separately."
+weights_license = "MIT"
+license_status = "verified"
+commercial_use = "allowed"
+attribution = "Retain MIT copyright and permission notice when redistributing covered material."
+dataset_notes = "Training-data provenance remains a separate research item."
+verified_on = "2026-08-18"
+capabilities = []
+languages = []
+hardware = []
+restrictions = ["Generated audio includes Resemble AI PerTh watermarking according to upstream documentation."]
+notes = "Family record. Runnable variants are tracked separately."
+
+[engine.chatterbox_base]
+name = "Chatterbox Base"
+family = "Chatterbox"
+kind = "tts"
+version = "0.1.7 / 500M"
+upstream = "https://github.com/resemble-ai/chatterbox"
+zone = "runtime"
+integration_status = "adapter_ready"
+code_license = "MIT"
+weights_license = "MIT"
+license_status = "verified"
+commercial_use = "allowed"
+attribution = "MIT notice retention when redistributing covered code/weights."
+dataset_notes = "Training-data provenance still requires separate review."
+verified_on = "2026-08-18"
+worker = "chatterbox_base"
+capabilities = ["voice_cloning", "style_control"]
+languages = ["en"]
+hardware = ["cpu", "cuda", "mps"]
+restrictions = ["PerTh watermark is embedded by upstream model code."]
+notes = "Adapter implemented; awaiting this lab's real-model qualification run."
+
+[engine.chatterbox_nano]
+name = "Chatterbox Nano"
+family = "Chatterbox"
+kind = "tts"
+version = "0.1.7 / 110M"
+upstream = "https://github.com/resemble-ai/chatterbox"
+zone = "runtime"
+integration_status = "adapter_ready"
+code_license = "MIT"
+weights_license = "MIT"
+license_status = "verified"
+commercial_use = "allowed"
+attribution = "MIT notice retention when redistributing covered code/weights."
+dataset_notes = "Training-data provenance still requires separate review."
+verified_on = "2026-08-18"
+worker = "chatterbox_nano"
+capabilities = ["cpu", "voice_cloning", "paralinguistic_tags", "style_control"]
+languages = ["en"]
+hardware = ["cpu", "cuda"]
+restrictions = ["PerTh watermark is embedded by upstream model code."]
+notes = "110M CPU/on-device target. Qualification uses a synthetic reference voice generated inside the lab."
+
+[engine.chatterbox_turbo]
+name = "Chatterbox Turbo"
+family = "Chatterbox"
+kind = "tts"
+version = "0.1.7 / 350M"
+upstream = "https://github.com/resemble-ai/chatterbox"
+zone = "runtime"
+integration_status = "adapter_ready"
+code_license = "MIT"
+weights_license = "MIT"
+license_status = "verified"
+commercial_use = "allowed"
+attribution = "MIT notice retention when redistributing covered code/weights."
+dataset_notes = "Training-data provenance still requires separate review."
+verified_on = "2026-08-18"
+worker = "chatterbox_turbo"
+capabilities = ["voice_cloning", "paralinguistic_tags", "style_control"]
+languages = ["en"]
+hardware = ["cuda", "cpu_possible"]
+restrictions = ["PerTh watermark is embedded by upstream model code."]
+notes = "350M low-latency family member; model repository is several GB."
+
+[engine.chatterbox_v3]
+name = "Chatterbox Multilingual V3"
+family = "Chatterbox"
+kind = "tts"
+version = "0.1.7 / 500M"
+upstream = "https://github.com/resemble-ai/chatterbox"
+zone = "runtime"
+integration_status = "adapter_ready"
+code_license = "MIT"
+weights_license = "MIT"
+license_status = "verified"
+commercial_use = "allowed"
+attribution = "MIT notice retention when redistributing covered code/weights."
+dataset_notes = "Training-data provenance still requires separate review."
+verified_on = "2026-08-18"
+worker = "chatterbox_v3"
+capabilities = ["multilingual", "voice_cloning", "style_control"]
+languages = ["ar", "da", "de", "el", "en", "es", "fi", "fr", "he", "hi", "it", "ja", "ko", "ms", "nl", "no", "pl", "pt", "ru", "sv", "sw", "tr", "zh"]
+hardware = ["cuda", "cpu_possible", "mps"]
+restrictions = ["PerTh watermark is embedded by upstream model code."]
+notes = "23+ language general-purpose multilingual checkpoint; real-model qualification still pending."
 
 [engine.qwen3_tts]
-name = "Qwen3-TTS"
+name = "Qwen3-TTS family"
+family = "Qwen3-TTS"
+kind = "family"
+version = "qwen-tts 0.1.1"
 upstream = "https://github.com/QwenLM/Qwen3-TTS"
 zone = "runtime"
 integration_status = "researching"
 code_license = "Apache-2.0"
-weights_license = "unknown"
-license_status = "partially_verified"
-notes = "Voice design, cloning and streaming candidate. Code LICENSE checked; weights still tracked separately."
+weights_license = "Apache-2.0"
+license_status = "verified"
+commercial_use = "allowed_with_attribution"
+attribution = "Apache-2.0 notice obligations apply when redistributing covered material."
+dataset_notes = "Dataset/training provenance remains a separate review item."
+verified_on = "2026-08-18"
+capabilities = []
+languages = []
+hardware = []
+restrictions = []
+notes = "Family record; 0.6B and 1.7B variants have materially different capabilities."
+
+[engine.qwen3_custom_06b]
+name = "Qwen3-TTS 0.6B CustomVoice"
+family = "Qwen3-TTS"
+kind = "tts"
+version = "qwen-tts 0.1.1 / 0.6B"
+upstream = "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
+zone = "runtime"
+integration_status = "adapter_ready"
+code_license = "Apache-2.0"
+weights_license = "Apache-2.0"
+license_status = "verified"
+commercial_use = "allowed_with_attribution"
+attribution = "Apache-2.0 notice obligations apply when redistributing covered material."
+dataset_notes = "Dataset/training provenance remains a separate review item."
+verified_on = "2026-08-18"
+worker = "qwen3_custom_06b"
+capabilities = ["multilingual", "streaming", "style_control"]
+languages = ["zh", "en", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"]
+hardware = ["cuda_recommended", "cpu_unqualified"]
+restrictions = []
+notes = "2.5GB repository; built-in speaker timbres. Adapter awaits GitHub runner qualification."
+
+[engine.qwen3_base_06b]
+name = "Qwen3-TTS 0.6B Base"
+family = "Qwen3-TTS"
+kind = "tts"
+version = "qwen-tts 0.1.1 / 0.6B"
+upstream = "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+zone = "runtime"
+integration_status = "adapter_ready"
+code_license = "Apache-2.0"
+weights_license = "Apache-2.0"
+license_status = "verified"
+commercial_use = "allowed_with_attribution"
+attribution = "Apache-2.0 notice obligations apply when redistributing covered material."
+dataset_notes = "Dataset/training provenance remains a separate review item."
+verified_on = "2026-08-18"
+worker = "qwen3_base_06b"
+capabilities = ["multilingual", "streaming", "voice_cloning", "voice_cache"]
+languages = ["zh", "en", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"]
+hardware = ["cuda_recommended", "cpu_unqualified"]
+restrictions = []
+notes = "Rapid cloning family member. Adapter supports synthetic-reference qualification."
+
+[engine.qwen3_voice_design_17b]
+name = "Qwen3-TTS 1.7B VoiceDesign"
+family = "Qwen3-TTS"
+kind = "tts"
+version = "qwen-tts 0.1.1 / 1.7B"
+upstream = "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
+zone = "runtime"
+integration_status = "planned"
+code_license = "Apache-2.0"
+weights_license = "Apache-2.0"
+license_status = "verified"
+commercial_use = "allowed_with_attribution"
+attribution = "Apache-2.0 notice obligations apply when redistributing covered material."
+dataset_notes = "Dataset/training provenance remains a separate review item."
+verified_on = "2026-08-18"
+capabilities = ["multilingual", "streaming", "voice_design", "style_control"]
+languages = ["zh", "en", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"]
+hardware = ["cuda_recommended"]
+restrictions = []
+notes = "Native natural-language Voice Design target; kept separate from 0.6B variants."
 
 [engine.cosyvoice]
-name = "CosyVoice"
+name = "CosyVoice family"
+family = "CosyVoice"
+kind = "family"
+version = "3.x"
 upstream = "https://github.com/FunAudioLLM/CosyVoice"
 zone = "runtime"
 integration_status = "researching"
-code_license = "unknown"
-weights_license = "unknown"
-license_status = "unverified"
-notes = "Pronunciation inpainting, bi-streaming and instruction control are high-value study targets."
+code_license = "Apache-2.0"
+weights_license = "varies_by_checkpoint"
+license_status = "partially_verified"
+commercial_use = "checkpoint_dependent"
+attribution = "Verify each selected checkpoint; preserve applicable Apache/model-card notices."
+dataset_notes = "Dataset/training provenance remains a separate review item."
+verified_on = "2026-08-18"
+capabilities = []
+languages = []
+hardware = []
+restrictions = []
+notes = "Family alias retained for registry compatibility; qualify concrete checkpoints separately."
 
-[engine.voxcpm2]
-name = "VoxCPM2"
-upstream = "https://github.com/OpenBMB/VoxCPM"
+[engine.cosyvoice3]
+name = "Fun-CosyVoice3 0.5B 2512"
+family = "CosyVoice"
+kind = "tts"
+version = "0.5B-2512"
+upstream = "https://github.com/FunAudioLLM/CosyVoice"
 zone = "runtime"
 integration_status = "researching"
 code_license = "Apache-2.0"
 weights_license = "Apache-2.0"
-license_status = "partially_verified"
-notes = "Tokenizer-free, multilingual, voice-design and cloning research target."
+license_status = "verified"
+commercial_use = "allowed_with_attribution"
+attribution = "Apache-2.0 notice obligations apply when redistributing covered material."
+dataset_notes = "Dataset/training provenance remains a separate review item."
+verified_on = "2026-08-18"
+capabilities = ["multilingual", "streaming", "voice_cloning", "pronunciation_inpainting", "style_control"]
+languages = ["zh", "en", "ja", "ko", "de", "es", "fr", "it", "ru"]
+hardware = ["cuda_recommended"]
+restrictions = []
+notes = "Current model repository is about 9.75GB and upstream expects source checkout/submodules; use dedicated source/container qualification rather than pretending pip isolation is enough."
+
+[engine.voxcpm2]
+name = "VoxCPM2"
+family = "VoxCPM"
+kind = "tts"
+version = "2B"
+upstream = "https://github.com/OpenBMB/VoxCPM"
+zone = "runtime"
+integration_status = "adapter_ready"
+code_license = "Apache-2.0"
+weights_license = "Apache-2.0"
+license_status = "verified"
+commercial_use = "allowed_with_attribution"
+attribution = "Apache-2.0 notice obligations apply when redistributing covered material."
+dataset_notes = "Dataset/training provenance remains a separate review item."
+verified_on = "2026-08-18"
+worker = "voxcpm2"
+capabilities = ["multilingual", "streaming", "voice_cloning", "voice_design"]
+languages = ["ar", "zh", "en", "fr", "de", "it", "ja", "ko", "pt", "ru", "es", "tr", "hi", "vi", "th", "id", "ms", "nl", "pl", "sv", "da", "no", "fi", "cs", "el", "hu", "ro", "uk", "he", "fa"]
+hardware = ["cuda_recommended", "cpu_unqualified"]
+restrictions = ["Upstream explicitly warns against impersonation, fraud and disinformation and recommends labeling AI-generated content."]
+notes = "Tokenizer-free 2B multilingual candidate. Adapter uses official VoxCPM.from_pretrained API."
+
+[engine.openvoice_v2]
+name = "OpenVoice V2"
+family = "OpenVoice"
+kind = "voice_conversion"
+version = "V2"
+upstream = "https://github.com/myshell-ai/OpenVoice"
+zone = "runtime"
+integration_status = "component"
+code_license = "MIT"
+weights_license = "MIT"
+license_status = "verified"
+commercial_use = "allowed"
+attribution = "Retain MIT notice when redistributing covered material."
+dataset_notes = "Underlying base-speaker/TTS provenance must be tracked separately."
+verified_on = "2026-08-18"
+capabilities = ["voice_cloning", "voice_conversion", "cross_lingual"]
+languages = ["en", "es", "fr", "zh", "ja", "ko"]
+hardware = ["cpu", "cuda"]
+restrictions = []
+notes = "Treat as a tone-color conversion/cloning component rather than pretending it is a standalone text-to-waveform backend."
+
+[engine.melotts]
+name = "MeloTTS"
+family = "MeloTTS"
+kind = "tts"
+version = "0.1.2"
+upstream = "https://github.com/myshell-ai/MeloTTS"
+zone = "runtime"
+integration_status = "adapter_ready"
+code_license = "MIT"
+weights_license = "MIT"
+license_status = "verified"
+commercial_use = "allowed"
+attribution = "Retain MIT notice when redistributing covered material."
+dataset_notes = "Model-specific data/provenance remains separate."
+verified_on = "2026-08-18"
+worker = "melotts"
+capabilities = ["cpu", "multilingual", "multi_accent"]
+languages = ["en", "es", "fr", "zh", "ja", "ko"]
+hardware = ["cpu", "cuda"]
+restrictions = []
+notes = "Older stack developed/tested on Python 3.9; isolated worker intentionally pins a legacy-compatible environment."
+
+[engine.vibevoice_realtime]
+name = "VibeVoice Realtime 0.5B"
+family = "VibeVoice"
+kind = "tts"
+version = "0.5B"
+upstream = "https://github.com/microsoft/VibeVoice"
+zone = "research"
+integration_status = "adapter_ready"
+code_license = "MIT"
+weights_license = "MIT metadata + model-card use restrictions"
+license_status = "verified_with_use_restrictions"
+commercial_use = "research_only"
+attribution = "MIT notice plus model-card responsible-use restrictions."
+dataset_notes = "Research framework; training/base-model provenance must be reviewed separately."
+verified_on = "2026-08-18"
+worker = "vibevoice_realtime"
+capabilities = ["streaming", "long_form", "low_latency"]
+languages = ["en", "de", "fr", "it", "ja", "ko", "nl", "pl", "pt", "es"]
+hardware = ["cuda_recommended"]
+restrictions = ["Model card limits intended use to research and excludes multiple impersonation/live-deepfake scenarios."]
+notes = "Kept in research zone despite MIT metadata because the current model card imposes explicit intended-use restrictions."
