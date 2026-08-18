@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 import time
+import traceback
 import wave
 from pathlib import Path
 
@@ -12,7 +13,7 @@ def describe() -> dict[str, object]:
     return {
         "schema_version": 1,
         "engine": "melotts",
-        "adapter_version": "0.2.0",
+        "adapter_version": "0.2.1",
         "capabilities": {
             "cpu": True,
             "multilingual": True,
@@ -25,20 +26,21 @@ def _install_mecab_lite_compat() -> None:
     """Keep Melo's eager Japanese import from requiring the full UniDic download.
 
     Melo imports every language frontend even for EN, and japanese.py constructs
-    MeCab.Tagger() at import time.  Route zero-argument Tagger calls to the bundled
-    unidic-lite dictionary inside this isolated legacy worker only.
+    MeCab.Tagger() at import time. Preserve Tagger as a type while routing only
+    zero-argument construction to the bundled unidic-lite dictionary.
     """
     import MeCab
     import unidic_lite
 
     original_tagger = MeCab.Tagger
 
-    def tagger(*args, **kwargs):
-        if not args and not kwargs:
-            return original_tagger(f'-r /dev/null -d "{unidic_lite.DICDIR}"')
-        return original_tagger(*args, **kwargs)
+    class LiteTagger(original_tagger):
+        def __init__(self, *args, **kwargs):
+            if not args and not kwargs:
+                args = (f'-r /dev/null -d "{unidic_lite.DICDIR}"',)
+            super().__init__(*args, **kwargs)
 
-    MeCab.Tagger = tagger
+    MeCab.Tagger = LiteTagger
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -86,12 +88,13 @@ def main(argv: list[str] | None = None) -> int:
                     "generation_real_time_factor": generation_seconds / duration if duration else None,
                     "language": args.language,
                     "device": args.device,
-                    "mecab_dictionary": "unidic-lite compatibility shim",
+                    "mecab_dictionary": "unidic-lite compatibility subclass",
                 }
             )
         )
         return 0
     except Exception as exc:  # noqa: BLE001
+        traceback.print_exc()
         print(json.dumps({"error": type(exc).__name__, "message": str(exc)}), file=sys.stderr)
         return 5
 
