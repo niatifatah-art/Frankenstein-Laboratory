@@ -39,12 +39,15 @@ def synthesize(args: argparse.Namespace) -> int:
     load_started = time.perf_counter()
     if args.variant in {"nano", "turbo"}:
         from chatterbox.tts_turbo import ChatterboxTurboTTS
+
         model = ChatterboxTurboTTS.from_pretrained(device=args.device, nano=args.variant == "nano")
     elif args.variant == "v3":
         from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+
         model = ChatterboxMultilingualTTS.from_pretrained(device=args.device, t3_model="v3")
     else:
         from chatterbox.tts import ChatterboxTTS
+
         model = ChatterboxTTS.from_pretrained(device=args.device)
     load_seconds = time.perf_counter() - load_started
 
@@ -105,8 +108,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         return synthesize(args)
-    except Exception as exc:
-        print(json.dumps({"error": type(exc).__name__, "message": str(exc)}, ensure_ascii=False), file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001
+        print(
+            json.dumps({"error": type(exc).__name__, "message": str(exc)}, ensure_ascii=False),
+            file=sys.stderr,
+        )
         return 5
 
 
