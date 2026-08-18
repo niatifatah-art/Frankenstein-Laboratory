@@ -19,6 +19,13 @@ class WorkerSpec:
 
 
 @dataclass(frozen=True, slots=True)
+class ComponentSpec:
+    key: str
+    project_dir: Path
+    runner: Path
+
+
+@dataclass(frozen=True, slots=True)
 class WorkerExecution:
     command: tuple[str, ...]
     returncode: int
@@ -46,6 +53,10 @@ _WORKER_LAYOUT: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "melotts": ("engines/melotts", "runner.py", ()),
 }
 
+_COMPONENT_LAYOUT: dict[str, tuple[str, str]] = {
+    "openvoice_v2": ("components/openvoice_v2", "runner.py"),
+}
+
 
 def get_worker(key: str) -> WorkerSpec:
     try:
@@ -63,11 +74,21 @@ def get_worker(key: str) -> WorkerSpec:
     )
 
 
+def get_component(key: str) -> ComponentSpec:
+    try:
+        project_rel, runner_rel = _COMPONENT_LAYOUT[key]
+    except KeyError as exc:
+        raise KeyError(f"No isolated component registered for {key!r}") from exc
+    root = repository_root()
+    project_dir = root / project_rel
+    return ComponentSpec(key=key, project_dir=project_dir, runner=project_dir / runner_rel)
+
+
 def _uv() -> str:
     uv = shutil.which("uv")
     if uv is None:
         raise RuntimeError(
-            "uv is required to run isolated engine workers. "
+            "uv is required to run isolated workers and components. "
             "Install it with `python -m pip install uv` or from Astral."
         )
     return uv
@@ -102,6 +123,44 @@ def build_worker_command(
     return tuple(command)
 
 
+def build_component_command(
+    key: str,
+    *,
+    source: Path | None = None,
+    target_reference: Path | None = None,
+    output: Path | None = None,
+    describe: bool = False,
+    extra_args: list[str] | None = None,
+) -> tuple[str, ...]:
+    component = get_component(key)
+    command = [
+        _uv(),
+        "run",
+        "--project",
+        str(component.project_dir),
+        "python",
+        str(component.runner),
+    ]
+    if describe:
+        command.append("--describe")
+    else:
+        if source is None or target_reference is None or output is None:
+            raise ValueError("source, target_reference and output are required for conversion")
+        command.extend(
+            [
+                "--source",
+                str(source),
+                "--target-reference",
+                str(target_reference),
+                "--output",
+                str(output),
+            ]
+        )
+    if extra_args:
+        command.extend(extra_args)
+    return tuple(command)
+
+
 def _last_json_object(text: str) -> dict[str, Any] | None:
     for line in reversed(text.splitlines()):
         candidate = line.strip()
@@ -114,6 +173,23 @@ def _last_json_object(text: str) -> dict[str, Any] | None:
         if isinstance(payload, dict):
             return payload
     return None
+
+
+def _execute(command: tuple[str, ...], timeout_seconds: float | None) -> WorkerExecution:
+    completed = subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=timeout_seconds,
+    )
+    return WorkerExecution(
+        command=command,
+        returncode=completed.returncode,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
+        payload=_last_json_object(completed.stdout),
+    )
 
 
 def execute_worker(
@@ -132,20 +208,28 @@ def execute_worker(
         describe=describe,
         extra_args=extra_args,
     )
-    completed = subprocess.run(
-        command,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
+    return _execute(command, timeout_seconds)
+
+
+def execute_component(
+    key: str,
+    *,
+    source: Path | None = None,
+    target_reference: Path | None = None,
+    output: Path | None = None,
+    describe: bool = False,
+    extra_args: list[str] | None = None,
+    timeout_seconds: float | None = None,
+) -> WorkerExecution:
+    command = build_component_command(
+        key,
+        source=source,
+        target_reference=target_reference,
+        output=output,
+        describe=describe,
+        extra_args=extra_args,
     )
-    return WorkerExecution(
-        command=command,
-        returncode=completed.returncode,
-        stdout=completed.stdout,
-        stderr=completed.stderr,
-        payload=_last_json_object(completed.stdout),
-    )
+    return _execute(command, timeout_seconds)
 
 
 def run_worker(
