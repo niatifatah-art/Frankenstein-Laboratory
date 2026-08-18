@@ -11,13 +11,13 @@ def describe() -> dict[str, object]:
     return {
         "schema_version": 1,
         "engine": "voxcpm2",
-        "adapter_version": "0.1.0",
+        "adapter_version": "0.2.0",
         "capabilities": {
             "multilingual": True,
             "streaming": True,
             "voice_cloning": True,
             "voice_design": True,
-            "sample_rate": 16000,
+            "sample_rate": 48000,
         },
     }
 
@@ -30,7 +30,12 @@ def synthesize(args: argparse.Namespace) -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
     started = time.perf_counter()
     load_started = time.perf_counter()
-    model = VoxCPM.from_pretrained("openbmb/VoxCPM2", optimize=False, device=args.device)
+    model = VoxCPM.from_pretrained(
+        "openbmb/VoxCPM2",
+        load_denoiser=False,
+        optimize=False,
+        device=args.device,
+    )
     load_seconds = time.perf_counter() - load_started
     generation_started = time.perf_counter()
     kwargs = {
@@ -63,6 +68,7 @@ def synthesize(args: argparse.Namespace) -> int:
                 "generation_real_time_factor": generation_seconds / duration if duration else None,
                 "device": args.device,
                 "steps": args.steps,
+                "denoiser_loaded": False,
             },
             ensure_ascii=False,
         )
