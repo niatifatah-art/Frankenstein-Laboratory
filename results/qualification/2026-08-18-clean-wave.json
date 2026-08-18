@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-08-18",
+  "workflow_run": 32180309921,
+  "environment": {
+    "runner": "GitHub hosted Ubuntu 24.04",
+    "qualification_note": "These are cold CPU qualification baselines, not equal-text quality or speed rankings."
+  },
+  "passed": {
+    "chatterbox_base": {
+      "sample_rate": 24000,
+      "audio_duration_seconds": 3.68,
+      "model_load_seconds": 56.051551082,
+      "generation_seconds": 28.558498532,
+      "total_seconds": 84.614571048,
+      "generation_real_time_factor": 7.7604615576086955,
+      "artifact_id": 9340561759,
+      "artifact_digest": "sha256:9125e75dffe09ff3086936b52c855ad0142bb3eda07375e233291cbd348b3415",
+      "source_revision": "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+    },
+    "chatterbox_nano": {
+      "sample_rate": 24000,
+      "audio_duration_seconds": 4.68,
+      "model_load_seconds": 34.239451518,
+      "generation_seconds": 21.466910829,
+      "total_seconds": 55.709930763,
+      "generation_real_time_factor": 4.586946758333333,
+      "reference": "synthetic Kokoro reference generated inside the lab",
+      "artifact_id": 9340570332,
+      "artifact_digest": "sha256:7acf03b9385cf01a5e858c0e41ffcc54bc764ce879087c56dc4a1ee300c5746b",
+      "source_revision": "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+    },
+    "chatterbox_turbo": {
+      "sample_rate": 24000,
+      "audio_duration_seconds": 5.24,
+      "model_load_seconds": 47.184296655,
+      "generation_seconds": 20.819056555,
+      "total_seconds": 68.028891381,
+      "generation_real_time_factor": 3.973102395992366,
+      "reference": "synthetic Kokoro reference generated inside the lab",
+      "artifact_id": 9340585121,
+      "artifact_digest": "sha256:b63838e99380573071918ad84f73a010b963e4dd1a2369458d6550fa992f0cff",
+      "source_revision": "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+    },
+    "chatterbox_v3": {
+      "sample_rate": 24000,
+      "audio_duration_seconds": 5.52,
+      "model_load_seconds": 39.098404023,
+      "generation_seconds": 66.427066193,
+      "total_seconds": 105.528986259,
+      "generation_real_time_factor": 12.033888803079712,
+      "reference": "synthetic Kokoro reference generated inside the lab",
+      "artifact_id": 9340596380,
+      "artifact_digest": "sha256:cd5d7e56a8c5b0813fe1d0dbadcdbf299e5633a15854ebe84c236d9f660bbe03",
+      "source_revision": "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+    },
+    "qwen3_custom_06b": {
+      "sample_rate": 24000,
+      "audio_duration_seconds": 6.0,
+      "model_load_seconds": 13.78823877100001,
+      "generation_seconds": 161.542122979,
+      "total_seconds": 175.33290501800002,
+      "generation_real_time_factor": 26.923687163166665,
+      "model_id": "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
+      "speaker": "Ryan",
+      "device": "cpu",
+      "artifact_id": 9340629250,
+      "artifact_digest": "sha256:24e74dca477121e743235ad77cfb67e16d4cddb85e9cbc56c0e65471c283c128"
+    },
+    "qwen3_base_06b": {
+      "sample_rate": 24000,
+      "audio_duration_seconds": 3.76,
+      "model_load_seconds": 13.390955518,
+      "generation_seconds": 131.145034079,
+      "total_seconds": 144.538023783,
+      "generation_real_time_factor": 34.87899842526596,
+      "model_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+      "reference": "synthetic Kokoro reference generated inside the lab",
+      "device": "cpu",
+      "artifact_id": 9340626087,
+      "artifact_digest": "sha256:38215edf31961a9842a76f3779cff6ee52eb0b6a05754186b19a12ab422df5b5"
+    },
+    "voxcpm2": {
+      "sample_rate": 48000,
+      "audio_duration_seconds": 5.28,
+      "model_load_seconds": 48.859873776,
+      "generation_seconds": 28.57994722799998,
+      "total_seconds": 77.495856218,
+      "generation_real_time_factor": 5.412868793181814,
+      "device": "cpu",
+      "inference_timesteps": 2,
+      "denoiser_loaded": false,
+      "model_snapshot": "32279effe8c19989596f05d353d1447f51d9e915",
+      "artifact_id": 9340560127,
+      "artifact_digest": "sha256:3fc2e9266daede731d97a4a682fa0176620a181cfa5cc63188a6da5253ac8496"
+    }
+  },
+  "source_qualified": {
+    "cosyvoice3": {
+      "source_revision": "074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc",
+      "matcha_submodule_revision": "dd9105b380c23b8e1875cd7c1db7e25037f65913",
+      "claim": "source/submodule compile and contract only; no full checkpoint inference claim"
+    },
+    "openvoice_v2": {
+      "source_revision": "74a1d147b17a8c3092dd5430504bd83ef6c7eb23",
+      "claim": "ToneColorConverter source contract compiled; real conversion qualification pending"
+    },
+    "vibevoice_realtime": {
+      "source_revision": "94da20d98b2fa7688e9cbfaf7692ddb4954f7600",
+      "claim": "source/realtime contract compiled; kept in research zone"
+    }
+  },
+  "failed": {
+    "melotts": {
+      "stage": "import/runtime frontend initialization",
+      "reason": "Melo eagerly imports the Japanese frontend even for EN and constructs MeCab.Tagger before English synthesis; a worker-local unidic-lite compatibility fix is staged for rerun.",
+      "artifact_id": 9340528601,
+      "artifact_digest": "sha256:18b575b8ee9a9573865a3c83ecf26b79b99da6ea734a925e1e50124cf38ef535"
+    }
+  }
+}
