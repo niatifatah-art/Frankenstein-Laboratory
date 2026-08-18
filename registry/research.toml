@@ -1,0 +1,298 @@
+# Research-zone systems. These records are intentionally separate from runtime engines.
+# `researching` means useful enough to study but not qualified for product routing.
+# Code and weights licenses are tracked separately whenever upstream makes that distinction.
+
+[engine.dia2]
+name = "Dia2"
+family = "Dia"
+kind = "tts_dialogue"
+version = "1B/2B family"
+upstream = "https://github.com/nari-labs/dia2"
+zone = "research"
+integration_status = "researching"
+code_license = "Apache-2.0"
+weights_license = "model_card_verification_required"
+license_status = "partially_verified"
+commercial_use = "checkpoint_dependent"
+attribution = "Apache-2.0 for repository code; verify selected model card before shipping weights."
+dataset_notes = "Training-data and released-checkpoint provenance require separate review."
+verified_on = "2026-08-18"
+capabilities = ["dialogue", "streaming", "long_form"]
+languages = ["en"]
+hardware = ["cuda_recommended"]
+restrictions = []
+notes = "Current Nari Labs generation after Dia; architecture candidate for streaming dialogue and multi-speaker state."
+
+[engine.glm_tts]
+name = "GLM-TTS"
+family = "GLM-TTS"
+kind = "tts"
+version = "current official release"
+upstream = "https://github.com/zai-org/GLM-TTS"
+zone = "research"
+integration_status = "researching"
+code_license = "Apache-2.0"
+weights_license = "model_card_verification_required"
+license_status = "partially_verified"
+commercial_use = "checkpoint_dependent"
+attribution = "Apache-2.0 for repository code; verify checkpoint terms separately."
+dataset_notes = "Current project focuses on controllable/emotion-expressive zero-shot TTS; training provenance is a separate audit."
+verified_on = "2026-08-18"
+capabilities = ["voice_cloning", "style_control", "emotion_control"]
+languages = []
+hardware = ["cuda_recommended"]
+restrictions = []
+notes = "Official repository moved under zai-org; useful for controllability and reward-based expressive TTS research."
+
+[engine.styletts2]
+name = "StyleTTS2"
+family = "StyleTTS"
+kind = "tts"
+version = "StyleTTS2"
+upstream = "https://github.com/yl4579/StyleTTS2"
+zone = "research"
+integration_status = "researching"
+code_license = "MIT"
+weights_license = "checkpoint_dependent"
+license_status = "partially_verified"
+commercial_use = "checkpoint_dependent"
+attribution = "Retain MIT notice for code; verify selected checkpoints and phonemizer dependencies."
+dataset_notes = "Published checkpoints/data provenance must be reviewed per model."
+verified_on = "2026-08-18"
+capabilities = ["style_control", "voice_cloning"]
+languages = ["en"]
+hardware = ["cuda_recommended"]
+restrictions = ["Phonemizer/dependency licensing must be audited before product integration."]
+notes = "Important style/prosody architecture reference; code license verified independently from model/dependency terms."
+
+[engine.fireredtts2]
+name = "FireRedTTS2"
+family = "FireRedTTS"
+kind = "tts"
+version = "2"
+upstream = "https://github.com/FireRedTeam/FireRedTTS2"
+zone = "research"
+integration_status = "researching"
+code_license = "Apache-2.0"
+weights_license = "checkpoint_dependent"
+license_status = "partially_verified"
+commercial_use = "checkpoint_dependent"
+attribution = "Apache-2.0 for code; verify model-card terms before runtime promotion."
+dataset_notes = "Training-data provenance requires separate review."
+verified_on = "2026-08-18"
+capabilities = ["voice_cloning", "long_form"]
+languages = []
+hardware = ["cuda_recommended"]
+restrictions = []
+notes = "Research candidate for modern autoregressive/codec TTS behavior and long-form robustness."
+
+[engine.csm_sesame]
+name = "CSM / Sesame"
+family = "CSM"
+kind = "tts_dialogue"
+version = "current"
+upstream = "https://github.com/SesameAILabs/csm"
+zone = "research"
+integration_status = "researching"
+code_license = "Apache-2.0"
+weights_license = "model_card_dependent"
+license_status = "partially_verified"
+commercial_use = "checkpoint_dependent"
+attribution = "Apache-2.0 for repository code; model/base-model terms require separate review."
+dataset_notes = "Model and base-model provenance must be tracked separately."
+verified_on = "2026-08-18"
+capabilities = ["dialogue", "speaker_conditioning", "long_form"]
+languages = ["en"]
+hardware = ["cuda_recommended"]
+restrictions = []
+notes = "Useful conversational/context-conditioned speech architecture reference."
+
+[engine.bark]
+name = "Bark"
+family = "Bark"
+kind = "text_to_audio"
+version = "current Suno open source"
+upstream = "https://github.com/suno-ai/bark"
+zone = "research"
+integration_status = "researching"
+code_license = "MIT"
+weights_license = "model_card_verification_required"
+license_status = "partially_verified"
+commercial_use = "checkpoint_dependent"
+attribution = "Retain MIT notice for code; verify checkpoint terms."
+dataset_notes = "Generative text-to-audio/speech model; data provenance requires separate review."
+verified_on = "2026-08-18"
+capabilities = ["paralinguistic_tags", "non_speech_audio", "multilingual"]
+languages = ["multilingual"]
+hardware = ["cuda_recommended", "cpu_possible"]
+restrictions = []
+notes = "Keep as architecture/comparison system rather than a default production TTS backend."
+
+[engine.f5_tts]
+name = "F5-TTS"
+family = "F5-TTS"
+kind = "tts"
+version = "current"
+upstream = "https://github.com/SWivid/F5-TTS"
+zone = "research"
+integration_status = "researching"
+code_license = "MIT"
+weights_license = "CC-BY-NC-4.0 (official pretrained weights)"
+license_status = "verified_with_use_restrictions"
+commercial_use = "research_only"
+attribution = "MIT code notice; official pretrained weights are CC-BY-NC-4.0."
+dataset_notes = "Official pretrained weights inherit non-commercial restriction due to Emilia training data."
+verified_on = "2026-08-18"
+capabilities = ["voice_cloning", "flow_matching"]
+languages = ["zh", "en"]
+hardware = ["cuda_recommended"]
+restrictions = ["Do not promote official pretrained weights to commercial runtime without a commercially compatible checkpoint."
+]
+notes = "Very useful flow-matching architecture; code can be studied independently of non-commercial official weights."
+
+[engine.spark_tts]
+name = "Spark-TTS"
+family = "Spark-TTS"
+kind = "tts"
+version = "0.5B family"
+upstream = "https://github.com/SparkAudio/Spark-TTS"
+zone = "research"
+integration_status = "researching"
+code_license = "Apache-2.0"
+weights_license = "model_card_verification_required"
+license_status = "partially_verified"
+commercial_use = "checkpoint_dependent"
+attribution = "Apache-2.0 for code; verify checkpoint terms separately."
+dataset_notes = "Training data/model weights require separate provenance review."
+verified_on = "2026-08-18"
+capabilities = ["voice_cloning", "style_control", "streaming"]
+languages = ["zh", "en"]
+hardware = ["cuda_recommended"]
+restrictions = []
+notes = "Efficient LLM-based TTS research candidate with single-stream decoupled speech tokens."
+
+[engine.fish_speech]
+name = "Fish Speech"
+family = "Fish Speech"
+kind = "tts"
+version = "current 2026"
+upstream = "https://github.com/fishaudio/fish-speech"
+zone = "research"
+integration_status = "researching"
+code_license = "Fish Audio Research License"
+weights_license = "Fish Audio Research License"
+license_status = "verified_with_use_restrictions"
+commercial_use = "research_only"
+attribution = "Follow Fish Audio Research License attribution and acceptable-use terms."
+dataset_notes = "Current repository license covers Fish Audio materials; commercial use requires a separate written license."
+verified_on = "2026-08-18"
+capabilities = ["multilingual", "voice_cloning", "style_control"]
+languages = ["multilingual"]
+hardware = ["cuda_recommended"]
+restrictions = ["Commercial use requires a separate written license from Fish Audio."]
+notes = "Strong research system, deliberately excluded from commercial runtime routing under current license."
+
+[engine.higgs_audio]
+name = "Higgs Audio"
+family = "Higgs Audio"
+kind = "text_to_audio"
+version = "current"
+upstream = "https://github.com/boson-ai/higgs-audio"
+zone = "research"
+integration_status = "researching"
+code_license = "Apache-2.0"
+weights_license = "model_card_and_tokenizer_terms_require_review"
+license_status = "partially_verified"
+commercial_use = "checkpoint_dependent"
+attribution = "Apache-2.0 repository code plus third-party audio/tokenizer notices."
+dataset_notes = "Third-party audio processing/tokenizer licensing and model-card terms require dedicated audit."
+verified_on = "2026-08-18"
+capabilities = ["long_form", "dialogue", "expressive_audio"]
+languages = ["multilingual"]
+hardware = ["cuda_recommended"]
+restrictions = ["Audit audio tokenizer and model weights independently before product use."]
+notes = "Text-audio foundation-model research candidate; not treated as ordinary lightweight TTS."
+
+[engine.xtts_v2]
+name = "XTTS v2 / Coqui"
+family = "Coqui TTS"
+kind = "tts"
+version = "XTTS-v2"
+upstream = "https://github.com/coqui-ai/TTS"
+zone = "research"
+integration_status = "researching"
+code_license = "MPL-2.0"
+weights_license = "Coqui Public Model License (CPML)"
+license_status = "verified_with_custom_model_terms"
+commercial_use = "license_review_required"
+attribution = "MPL-2.0 applies to code; XTTS-v2 model use is governed separately by CPML."
+dataset_notes = "Model/data terms are separate from repository code license."
+verified_on = "2026-08-18"
+capabilities = ["multilingual", "voice_cloning"]
+languages = ["multilingual"]
+hardware = ["cuda_recommended", "cpu_possible"]
+restrictions = ["Do not infer model commercial rights from the MPL-2.0 code license."]
+notes = "Important compatibility/reference backend; custom model license requires explicit legal/product review."
+
+[engine.indextts2]
+name = "IndexTTS2"
+family = "IndexTTS"
+kind = "tts"
+version = "2"
+upstream = "https://github.com/index-tts/index-tts"
+zone = "research"
+integration_status = "researching"
+code_license = "bilibili Model Use License Agreement"
+weights_license = "bilibili Model Use License Agreement"
+license_status = "verified_with_use_restrictions"
+commercial_use = "threshold_restricted"
+attribution = "Retain license/copyright notices and comply with downstream obligations."
+dataset_notes = "Custom model license governs model, weights and published final code as defined by upstream."
+verified_on = "2026-08-18"
+capabilities = ["voice_cloning", "emotion_control", "style_control"]
+languages = ["zh", "en"]
+hardware = ["cuda_recommended"]
+restrictions = ["Entities over upstream MAU/revenue thresholds require a separate license; additional downstream/high-risk-use obligations apply."]
+notes = "High-value controllable TTS research system; custom license prevents treating it as ordinary Apache/MIT runtime code."
+
+[engine.megatts3]
+name = "MegaTTS3"
+family = "MegaTTS"
+kind = "tts"
+version = "3"
+upstream = "https://github.com/bytedance/MegaTTS3"
+zone = "research"
+integration_status = "researching"
+code_license = "Apache-2.0"
+weights_license = "academic/safety-constrained release process"
+license_status = "verified_with_use_restrictions"
+commercial_use = "research_only"
+attribution = "Apache-2.0 for repository code; checkpoint/latent release has additional academic and safety constraints."
+dataset_notes = "WaveVAE encoder parameters are not publicly distributed; upstream provides/approves speaker latents for academic use."
+verified_on = "2026-08-18"
+capabilities = ["voice_cloning", "latent_diffusion"]
+languages = []
+hardware = ["cuda_recommended", "cpu_possible"]
+restrictions = ["Upstream states primary academic intent and withholds WaveVAE encoder parameters for security reasons."]
+notes = "Architecture/reference candidate, not a clean redistributable runtime dependency."
+
+[engine.orpheus_tts]
+name = "Orpheus TTS"
+family = "Orpheus"
+kind = "tts"
+version = "family"
+upstream = "https://github.com/canopyai/Orpheus-TTS"
+zone = "research"
+integration_status = "researching"
+code_license = "Apache-2.0"
+weights_license = "model/voice terms require separate verification"
+license_status = "partially_verified"
+commercial_use = "checkpoint_and_voice_dependent"
+attribution = "Apache-2.0 for code; verify individual model and preset-voice rights."
+dataset_notes = "Preset voice rights are not assumed from repository code license."
+verified_on = "2026-08-18"
+capabilities = ["streaming", "multilingual", "paralinguistic_tags"]
+languages = ["multilingual"]
+hardware = ["cuda_recommended"]
+restrictions = ["Preset voice licensing remains a separate unresolved product concern."]
+notes = "Useful real-time/LLM-style TTS family; code license is clear but voice/model rights must remain separate."
