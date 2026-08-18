@@ -1,0 +1,140 @@
+name: qualification-wave
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  chatterbox-base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: python -m pip install --upgrade uv
+      - name: Base real synthesis
+        run: |
+          mkdir -p outputs
+          uv run --project engines/chatterbox python engines/chatterbox/runner.py \
+            --variant base --device cpu \
+            --text "Frankenstein Laboratory is qualifying the original Chatterbox backend." \
+            --output outputs/chatterbox-base.wav | tee outputs/chatterbox-base.json
+      - name: Validate
+        run: python -c 'import wave; w=wave.open("outputs/chatterbox-base.wav","rb"); assert w.getnframes()>2400 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: chatterbox-base-qualification, path: outputs/, if-no-files-found: ignore}
+
+  chatterbox-nano:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: sudo apt-get update && sudo apt-get install -y espeak-ng
+      - run: python -m pip install --upgrade uv
+      - name: Create synthetic owned reference with Kokoro
+        run: |
+          mkdir -p outputs
+          uv run --project engines/kokoro python engines/kokoro/runner.py \
+            --text "This synthetic reference voice was generated inside Frankenstein Laboratory for controlled voice cloning qualification. It contains no human voice sample." \
+            --output outputs/synthetic-reference.wav
+      - name: Nano real cloning synthesis
+        run: |
+          uv run --project engines/chatterbox python engines/chatterbox/runner.py \
+            --variant nano --device cpu --reference outputs/synthetic-reference.wav \
+            --text "Hello from Chatterbox Nano. [chuckle] The controlled cloning path is alive." \
+            --output outputs/chatterbox-nano.wav | tee outputs/chatterbox-nano.json
+      - name: Validate
+        run: python -c 'import wave; w=wave.open("outputs/chatterbox-nano.wav","rb"); assert w.getnframes()>2400 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: chatterbox-nano-qualification, path: outputs/, if-no-files-found: ignore}
+
+  qwen3-custom-06b:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install --upgrade uv
+      - name: Qwen3 0.6B CustomVoice CPU attempt
+        run: |
+          mkdir -p outputs
+          uv run --project engines/qwen3_tts python engines/qwen3_tts/runner.py \
+            --variant custom --device cpu --language English --speaker Ryan \
+            --max-new-tokens 192 --text "Frankenstein Laboratory is testing Qwen three T T S." \
+            --output outputs/qwen3-custom-06b.wav | tee outputs/qwen3-custom-06b.json
+      - name: Validate
+        run: python -c 'import wave; w=wave.open("outputs/qwen3-custom-06b.wav","rb"); assert w.getnframes()>2400 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: qwen3-custom-06b-qualification, path: outputs/, if-no-files-found: ignore}
+
+  voxcpm2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: python -m pip install --upgrade uv
+      - name: VoxCPM2 constrained CPU attempt
+        run: |
+          mkdir -p outputs
+          uv run --project engines/voxcpm2 python engines/voxcpm2/runner.py \
+            --device cpu --steps 2 --max-len 80 \
+            --text "Frankenstein Laboratory verifies Vox C P M two." \
+            --output outputs/voxcpm2.wav | tee outputs/voxcpm2.json
+      - name: Validate
+        run: python -c 'import wave; w=wave.open("outputs/voxcpm2.wav","rb"); assert w.getnframes()>1600 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: voxcpm2-qualification, path: outputs/, if-no-files-found: ignore}
+
+  melotts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.10"}
+      - run: python -m pip install --upgrade uv
+      - name: MeloTTS install and synthesis attempt
+        run: |
+          mkdir -p outputs
+          uv run --project engines/melotts python -m unidic download || true
+          uv run --project engines/melotts python engines/melotts/runner.py \
+            --language EN --device cpu --text "Frankenstein Laboratory verifies Melo T T S." \
+            --output outputs/melotts.wav | tee outputs/melotts.json
+      - name: Validate
+        run: python -c 'import wave; w=wave.open("outputs/melotts.wav","rb"); assert w.getnframes()>2400 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: melotts-qualification, path: outputs/, if-no-files-found: ignore}
+
+  source-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.10"}
+      - name: CosyVoice source + submodule contract
+        run: |
+          git clone --depth 1 --recursive https://github.com/FunAudioLLM/CosyVoice.git /tmp/CosyVoice
+          python -m compileall -q /tmp/CosyVoice/cosyvoice
+          grep -q "cosyvoice3_example" /tmp/CosyVoice/example.py
+      - name: OpenVoice component contract
+        run: |
+          git clone --depth 1 https://github.com/myshell-ai/OpenVoice.git /tmp/OpenVoice
+          python -m compileall -q /tmp/OpenVoice/openvoice
+          grep -q "class ToneColorConverter" /tmp/OpenVoice/openvoice/api.py
+      - name: VibeVoice current source/realtime contract
+        run: |
+          git clone --depth 1 https://github.com/microsoft/VibeVoice.git /tmp/VibeVoice
+          python -m compileall -q /tmp/VibeVoice
+          grep -R -q "VibeVoice-Realtime-0.5B" /tmp/VibeVoice/README.md
