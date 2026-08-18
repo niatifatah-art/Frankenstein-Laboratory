@@ -105,14 +105,13 @@ def _record_from_raw(key: str, raw: dict[str, object]) -> EngineRecord:
     )
 
 
-def _qualification_overrides(registry_path: Path) -> dict[str, dict[str, object]]:
-    path = registry_path.with_name("qualifications.toml")
+def _overlay(path: Path, section: str) -> dict[str, dict[str, object]]:
     if not path.exists():
         return {}
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     return {
         str(key): dict(value)
-        for key, value in data.get("qualification", {}).items()
+        for key, value in data.get(section, {}).items()
         if isinstance(value, dict)
     }
 
@@ -127,7 +126,10 @@ def _static_registry_files(primary_path: Path) -> tuple[Path, ...]:
 
 def load_registry(path: Path | None = None) -> tuple[EngineRecord, ...]:
     registry_path = path or repository_root() / "registry" / "engines.toml"
-    overrides = _qualification_overrides(registry_path)
+    qualifications = _overlay(registry_path.with_name("qualifications.toml"), "qualification")
+    source_verifications = _overlay(
+        registry_path.with_name("source_verifications.toml"), "source"
+    )
     raw_records: dict[str, dict[str, object]] = {}
     for static_path in _static_registry_files(registry_path):
         data = tomllib.loads(static_path.read_text(encoding="utf-8"))
@@ -139,7 +141,8 @@ def load_registry(path: Path | None = None) -> tuple[EngineRecord, ...]:
     records = []
     for key, base_raw in raw_records.items():
         merged = dict(base_raw)
-        merged.update(overrides.get(key, {}))
+        merged.update(source_verifications.get(key, {}))
+        merged.update(qualifications.get(key, {}))
         records.append(_record_from_raw(key, merged))
     return tuple(sorted(records, key=lambda item: item.key))
 
