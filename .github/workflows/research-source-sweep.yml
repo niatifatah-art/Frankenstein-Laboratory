@@ -1,0 +1,77 @@
+name: research-source-sweep
+
+on:
+  pull_request:
+    paths:
+      - "registry/research.toml"
+      - ".github/workflows/research-source-sweep.yml"
+  workflow_dispatch:
+
+jobs:
+  source-sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify official repositories and license files
+        run: |
+          python - <<'PY'
+          import json, subprocess, urllib.request
+          from pathlib import Path
+
+          repos = {
+              'dia2': 'nari-labs/dia2',
+              'glm_tts': 'zai-org/GLM-TTS',
+              'styletts2': 'yl4579/StyleTTS2',
+              'fireredtts2': 'FireRedTeam/FireRedTTS2',
+              'csm_sesame': 'SesameAILabs/csm',
+              'bark': 'suno-ai/bark',
+              'f5_tts': 'SWivid/F5-TTS',
+              'spark_tts': 'SparkAudio/Spark-TTS',
+              'fish_speech': 'fishaudio/fish-speech',
+              'higgs_audio': 'boson-ai/higgs-audio',
+              'xtts_v2': 'coqui-ai/TTS',
+              'indextts2': 'index-tts/index-tts',
+              'megatts3': 'bytedance/MegaTTS3',
+              'orpheus_tts': 'canopyai/Orpheus-TTS',
+          }
+          out = {}
+          failures = []
+          for key, repo in repos.items():
+              url = f'https://github.com/{repo}.git'
+              proc = subprocess.run(['git', 'ls-remote', url, 'HEAD'], capture_output=True, text=True)
+              if proc.returncode or not proc.stdout.strip():
+                  out[key] = {'repo': repo, 'status': 'unreachable', 'stderr': proc.stderr[-500:]}
+                  failures.append(key)
+                  continue
+              sha = proc.stdout.split()[0]
+              license_path = None
+              for candidate in ('LICENSE', 'LICENSE.md', 'LICENSE.txt'):
+                  raw = f'https://raw.githubusercontent.com/{repo}/{sha}/{candidate}'
+                  try:
+                      with urllib.request.urlopen(raw, timeout=20) as response:
+                          if response.status == 200 and response.read(64):
+                              license_path = candidate
+                              break
+                  except Exception:
+                      pass
+              out[key] = {
+                  'repo': repo,
+                  'status': 'reachable',
+                  'head': sha,
+                  'license_file': license_path,
+              }
+          Path('outputs').mkdir(exist_ok=True)
+          Path('outputs/research-source-heads.json').write_text(json.dumps(out, indent=2))
+          print(json.dumps(out, indent=2))
+          if failures:
+              raise SystemExit(f'unreachable repositories: {failures}')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-source-heads
+          path: outputs/research-source-heads.json
+          if-no-files-found: error
