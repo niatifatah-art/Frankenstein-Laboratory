@@ -13,6 +13,7 @@ models/
 weights/
 outputs/
 benchmarks/artifacts/
+components/*/.runtime/
 *.wav
 *.mp3
 *.flac
