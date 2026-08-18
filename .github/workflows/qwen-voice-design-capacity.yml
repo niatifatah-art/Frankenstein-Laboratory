@@ -1,12 +1,6 @@
 name: qwen-voice-design-capacity
 
 on:
-  pull_request:
-    paths:
-      - "engines/qwen3_tts/**"
-      - "src/ttslab/isolation.py"
-      - "registry/qualifications.toml"
-      - ".github/workflows/qwen-voice-design-capacity.yml"
   workflow_dispatch:
 
 jobs:
