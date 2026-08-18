@@ -33,15 +33,15 @@ def synthesize(args: argparse.Namespace) -> int:
     model = VoxCPM.from_pretrained("openbmb/VoxCPM2", optimize=False, device=args.device)
     load_seconds = time.perf_counter() - load_started
     generation_started = time.perf_counter()
-    kwargs = dict(
-        text=args.text,
-        cfg_value=args.cfg,
-        inference_timesteps=args.steps,
-        max_len=args.max_len,
-        normalize=True,
-        denoise=False,
-        retry_badcase=False,
-    )
+    kwargs = {
+        "text": args.text,
+        "cfg_value": args.cfg,
+        "inference_timesteps": args.steps,
+        "max_len": args.max_len,
+        "normalize": True,
+        "denoise": False,
+        "retry_badcase": False,
+    }
     if args.reference:
         kwargs["reference_wav_path"] = str(args.reference.resolve())
     wav = model.generate(**kwargs)
@@ -92,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         return synthesize(args)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(json.dumps({"error": type(exc).__name__, "message": str(exc)}), file=sys.stderr)
         return 5
 
