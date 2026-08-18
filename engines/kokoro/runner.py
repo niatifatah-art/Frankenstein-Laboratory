@@ -6,7 +6,6 @@ import sys
 import time
 from pathlib import Path
 
-
 SCHEMA_VERSION = 1
 SAMPLE_RATE = 24_000
 
