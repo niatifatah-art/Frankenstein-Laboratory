@@ -1,8 +1,20 @@
 [project]
 name = "frankenstein-melotts-worker"
-version = "0.1.0"
+version = "0.2.0"
 requires-python = ">=3.9,<3.11"
 dependencies = [
-  "melotts @ git+https://github.com/myshell-ai/MeloTTS.git",
+  "melotts @ git+https://github.com/myshell-ai/MeloTTS.git@209145371cff8fc3bd60d7be902ea69cbdb7965a",
+  "setuptools<81",
+  "torch",
+  "torchaudio",
   "soundfile>=0.12",
 ]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+torchaudio = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
