@@ -6,9 +6,14 @@ def test_list_command_succeeds(capsys) -> None:
     output = capsys.readouterr().out
     assert "kokoro" in output
     assert "pocket_tts" in output
+    assert "qwen3_custom_06b" in output
 
 
 def test_run_refuses_unverified_adapter(capsys) -> None:
     assert main(["run", "chatterbox", "--text", "hello"]) == 3
-    error = capsys.readouterr().err
-    assert "planned" in error
+    assert "planned" in capsys.readouterr().err
+
+
+def test_registry_check_command(capsys) -> None:
+    assert main(["registry-check"]) == 0
+    assert "OK" in capsys.readouterr().out
