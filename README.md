@@ -6,18 +6,20 @@ This is not a "30 models behind one UI" project. The laboratory is expected to p
 
 ## Current phase
 
-Bootstrap. The repository currently contains:
+The Core is bootstrapped and the first external backend, **Kokoro**, has passed real-model CPU smoke tests through an isolated worker.
+
+The repository currently contains:
 
 - a minimal dependency-free Core
 - a machine-readable engine/provenance registry
 - an environment doctor
-- a CLI that refuses fake integrations
-- lightweight contract/registry tests
+- an isolated-worker boundary based on `uv` + subprocesses
+- a verified Kokoro worker using CPU-only PyTorch resolution
+- structured real-model smoke evidence
+- lightweight contract/registry/CLI tests
 - lightweight CI
 - the full project constitution in `PROJECT_INSTRUCTIONS.md`
 - an initial source-backed TTS landscape note
-
-No external engine is marked `ready` yet.
 
 ## Quick start
 
@@ -28,36 +30,30 @@ python -m ttslab doctor
 pytest
 ```
 
-A registered-but-unverified engine intentionally fails through the normal path:
+Run the first verified backend:
 
 ```bash
-python -m ttslab run kokoro --text "hello world"
+python -m ttslab run kokoro --text "hello world" --output outputs/kokoro.wav
 ```
 
-Experimental workers can be invoked explicitly while they are being qualified:
+Kokoro lives in its own `uv` project under `engines/kokoro/`; its PyTorch dependency is pinned to the CPU wheel index on Linux/Windows so a CPU install does not drag in CUDA packages.
+
+Experimental workers use the explicit smoke path until qualified:
 
 ```bash
-python -m ttslab smoke kokoro --text "hello world" --output outputs/kokoro.wav
+python -m ttslab smoke <engine> --text "hello world"
 ```
 
-The first Kokoro worker uses its own `uv` project under `engines/kokoro/`; it is not promoted to `ready` until a real-model smoke run passes.
+## Next vertical slice
 
-## Next milestone
-
-Make the first real isolated engine work end-to-end:
-
-```bash
-python -m ttslab run kokoro --text "hello world"
-```
-
-Then repeat the same contract with Pocket TTS and Chatterbox before expanding to heavier systems.
+Pocket TTS is the next lightweight backend to qualify, followed by Chatterbox. Once the adapter boundary is proven across multiple engines, the laboratory expands toward Qwen3-TTS, CosyVoice, VoxCPM2, and research-only systems.
 
 ## Principles
 
 - isolate external engines instead of forcing incompatible dependencies into one Python environment
-- verify code, model-weight, and dataset licenses separately
+- verify code, model-weight, dataset, and voice-asset licenses separately
 - prefer measurements over architecture-by-opinion
-- keep heavyweight model tests optional
+- keep heavyweight model tests optional/manual
 - never fabricate benchmark results
 - preserve failed experiments and provenance
 - gradually replace external components with our own implementations

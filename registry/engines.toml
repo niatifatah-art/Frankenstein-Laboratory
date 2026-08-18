@@ -1,17 +1,17 @@
 # Machine-readable provenance/integration registry.
-# "verified" here means the named code-license file was checked at the recorded upstream.
-# Model-weight and dataset licensing remain separate fields and must be checked independently.
+# "verified" here means the named source was checked at the recorded upstream.
+# Code, model-weight, dataset, and voice-asset licensing remain separate concerns.
 
 [engine.kokoro]
 name = "Kokoro"
 upstream = "https://github.com/hexgrad/kokoro"
 zone = "runtime"
-integration_status = "adapter_ready"
+integration_status = "ready"
 code_license = "Apache-2.0"
 weights_license = "Apache-2.0"
 license_status = "partially_verified"
 worker = "kokoro"
-notes = "82M lightweight candidate. Verify model-card/dataset provenance before shipping."
+notes = "82M lightweight backend. Two real-model CPU smoke runs passed on GitHub Ubuntu; dataset/provenance review remains separate from code/weights licensing."
 
 [engine.pocket_tts]
 name = "Pocket TTS"
@@ -19,9 +19,9 @@ upstream = "https://github.com/kyutai-labs/pocket-tts"
 zone = "runtime"
 integration_status = "planned"
 code_license = "MIT"
-weights_license = "unknown"
+weights_license = "CC-BY-4.0"
 license_status = "partially_verified"
-notes = "CPU-first, streaming and voice-cloning candidate; voice assets have separate license details."
+notes = "CPU-first, streaming and voice-cloning candidate. Model weights carry acceptable-use terms; voice assets have separate per-source licenses."
 
 [engine.chatterbox]
 name = "Chatterbox"

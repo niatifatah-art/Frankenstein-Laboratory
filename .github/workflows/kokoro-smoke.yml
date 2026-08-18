@@ -1,11 +1,6 @@
 name: kokoro-smoke
 
 on:
-  pull_request:
-    paths:
-      - "engines/kokoro/**"
-      - "src/ttslab/isolation.py"
-      - ".github/workflows/kokoro-smoke.yml"
   workflow_dispatch:
 
 jobs:

@@ -8,10 +8,10 @@ from ttslab.registry import get_engine
 REGISTRY = Path(__file__).parents[1] / "registry" / "engines.toml"
 
 
-def test_kokoro_worker_is_registered() -> None:
+def test_kokoro_worker_is_registered_and_ready() -> None:
     record = get_engine("kokoro", REGISTRY)
     assert record.worker == "kokoro"
-    assert record.integration_status == "adapter_ready"
+    assert record.integration_status == "ready"
 
 
 def test_unknown_worker_fails_explicitly() -> None:
