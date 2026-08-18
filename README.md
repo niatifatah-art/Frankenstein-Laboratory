@@ -2,62 +2,84 @@
 
 A reproducible laboratory for **running, benchmarking, dissecting, integrating, and learning from open-source text-to-speech systems** while progressively building an independent modular TTS platform.
 
-This is not a "30 models behind one UI" project. The laboratory is expected to produce evidence and reusable technology: stable adapter contracts, provenance records, fair benchmarks, our own text/pronunciation/prosody infrastructure, and eventually original synthesis components and models.
+This is not a "many models behind one UI" project. Every external engine is isolated, licensed/provenanced separately, tested against shared contracts, and promoted only after real evidence exists.
 
-## Current phase
+## Current qualification state
 
-The Core is bootstrapped and two external CPU backends have passed real-model smoke tests through isolated workers:
+Already qualified with real CPU synthesis:
 
-- **Kokoro** — lightweight 82M baseline
-- **Pocket TTS 2.1.0** — streaming, voice-state capable CPU backend
+- **Kokoro 0.9.4** — ready
+- **Pocket TTS 2.1.0** — ready, real streaming qualification
 
-The repository currently contains:
+Qualification wave staged in v0.2:
 
-- a minimal dependency-free Core
-- a machine-readable engine/provenance registry
-- an environment doctor
-- an isolated-worker boundary based on `uv` + subprocesses
-- verified Kokoro and Pocket TTS workers using CPU-only PyTorch resolution
-- structured real-model smoke evidence
-- lightweight contract/registry/CLI tests
-- lightweight CI
-- the full project constitution in `PROJECT_INSTRUCTIONS.md`
-- an initial source-backed TTS landscape note
+- Chatterbox Base / Nano / Turbo / Multilingual V3
+- Qwen3-TTS 0.6B CustomVoice / Base, with 1.7B VoiceDesign tracked separately
+- VoxCPM2
+- MeloTTS
+- CosyVoice3 source/container contract
+- OpenVoice V2 as a voice-conversion component rather than a fake standalone TTS backend
+- VibeVoice Realtime as a research-zone backend because current upstream use restrictions are stricter than repository license metadata alone
+
+## Core v0.2
+
+The Core now includes:
+
+- machine-readable engine, licensing, hardware and capability registry
+- strict integration states (`ready`, `adapter_ready`, `component`, `researching`, etc.)
+- isolated `uv` worker contracts
+- common worker JSON result parsing
+- shared multilingual benchmark corpus
+- PCM WAV validation and SHA-256 artifact identity
+- reproducible benchmark result writer
+- capability/language router that only selects qualified engines
+- registry validation and CI tests
+- qualification workflows that preserve failures instead of hiding them
 
 ## Quick start
 
 ```bash
 python -m pip install -e ".[dev]"
+python -m ttslab registry-check
 python -m ttslab list
+python -m ttslab corpus
 python -m ttslab doctor
 pytest
 ```
 
-Run verified backends:
+Run qualified engines:
 
 ```bash
 python -m ttslab run kokoro --text "hello world" --output outputs/kokoro.wav
 python -m ttslab run pocket_tts --text "hello world" --output outputs/pocket.wav
 ```
 
-Each engine lives in its own `uv` project. CPU PyTorch is pinned on Linux/Windows so CPU installs do not drag in CUDA packages.
-
-Experimental workers use the explicit smoke path until qualified:
+Ask the router for a qualified backend:
 
 ```bash
-python -m ttslab smoke <engine> --text "hello world"
+python -m ttslab route --require cpu --prefer streaming --language en
 ```
 
-## Next vertical slice
+Run one reproducible benchmark corpus case:
 
-Chatterbox is next. Nano is especially interesting for CPU/on-device use, but its official cloning example requires a reference clip; the laboratory will use an explicitly licensed or synthetic reference rather than silently pulling a human voice sample. After the lightweight adapter boundary is proven, the laboratory expands toward Qwen3-TTS, CosyVoice, VoxCPM2, and research-only systems.
+```bash
+python -m ttslab benchmark pocket_tts --case ar_en_codeswitch
+```
 
-## Principles
+Experimental adapters are deliberately gated behind `smoke` until a real-model qualification run passes:
 
-- isolate external engines instead of forcing incompatible dependencies into one Python environment
-- verify code, model-weight, dataset, and voice-asset licenses separately
-- prefer measurements over architecture-by-opinion
-- keep heavyweight model tests optional/manual
-- never fabricate benchmark results
-- preserve failed experiments and provenance
-- gradually replace external components with our own implementations
+```bash
+python -m ttslab smoke chatterbox_nano --text "hello"
+```
+
+## Rules
+
+- code license != model weights license != dataset license != voice asset license
+- a README claim is not our benchmark result
+- an adapter existing is not the same as a model working
+- a model loading is not the same as valid audio
+- research-only components do not silently enter the runtime product
+- one engine's dependency conflict must not break the laboratory
+- unmeasured values stay unknown
+
+See `PROJECT_INSTRUCTIONS.md` for the project constitution.
