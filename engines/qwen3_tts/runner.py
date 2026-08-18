@@ -8,18 +8,26 @@ from pathlib import Path
 
 CUSTOM = "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
 BASE = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+VOICE_DESIGN = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
+
+
+def _engine_key(variant: str) -> str:
+    if variant == "voice_design":
+        return "qwen3_voice_design_17b"
+    return f"qwen3_{variant}_06b"
 
 
 def describe(variant: str) -> dict[str, object]:
     return {
         "schema_version": 1,
-        "engine": f"qwen3_{variant}_06b",
-        "adapter_version": "0.1.0",
+        "engine": _engine_key(variant),
+        "adapter_version": "0.2.0",
         "capabilities": {
             "multilingual": True,
             "streaming_text_simulation": True,
             "voice_cloning": variant == "base",
-            "style_control": variant == "custom",
+            "voice_design": variant == "voice_design",
+            "style_control": variant in {"custom", "voice_design"},
             "languages": ["Chinese", "English", "Japanese", "Korean", "German", "French", "Russian", "Portuguese", "Spanish", "Italian"],
         },
     }
@@ -32,7 +40,11 @@ def synthesize(args: argparse.Namespace) -> int:
 
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    model_id = CUSTOM if args.variant == "custom" else BASE
+    model_id = {
+        "custom": CUSTOM,
+        "base": BASE,
+        "voice_design": VOICE_DESIGN,
+    }[args.variant]
     started = time.perf_counter()
     load_started = time.perf_counter()
     model = Qwen3TTSModel.from_pretrained(model_id, device_map=args.device, dtype=torch.bfloat16)
@@ -45,6 +57,13 @@ def synthesize(args: argparse.Namespace) -> int:
             language=args.language,
             speaker=args.speaker,
             instruct=args.instruct or "",
+            max_new_tokens=args.max_new_tokens,
+        )
+    elif args.variant == "voice_design":
+        wavs, sample_rate = model.generate_voice_design(
+            text=args.text,
+            language=args.language,
+            instruct=args.instruct or "A calm, clear adult synthetic voice with neutral pacing.",
             max_new_tokens=args.max_new_tokens,
         )
     else:
@@ -66,7 +85,7 @@ def synthesize(args: argparse.Namespace) -> int:
         json.dumps(
             {
                 "schema_version": 1,
-                "engine": f"qwen3_{args.variant}_06b",
+                "engine": _engine_key(args.variant),
                 "output_path": str(output),
                 "sample_rate": sample_rate,
                 "audio_duration_seconds": duration,
@@ -77,6 +96,7 @@ def synthesize(args: argparse.Namespace) -> int:
                 "model_id": model_id,
                 "language": args.language,
                 "speaker": args.speaker if args.variant == "custom" else None,
+                "instruct": args.instruct if args.variant == "voice_design" else None,
                 "device": args.device,
             },
             ensure_ascii=False,
@@ -88,7 +108,7 @@ def synthesize(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--describe", action="store_true")
-    parser.add_argument("--variant", choices=["custom", "base"], default="custom")
+    parser.add_argument("--variant", choices=["custom", "base", "voice_design"], default="custom")
     parser.add_argument("--text")
     parser.add_argument("--output", type=Path, default=Path("outputs/qwen3.wav"))
     parser.add_argument("--language", default="English")
