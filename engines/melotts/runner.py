@@ -12,13 +12,33 @@ def describe() -> dict[str, object]:
     return {
         "schema_version": 1,
         "engine": "melotts",
-        "adapter_version": "0.1.0",
+        "adapter_version": "0.2.0",
         "capabilities": {
             "cpu": True,
             "multilingual": True,
             "languages": ["EN", "ES", "FR", "ZH", "JP", "KR"],
         },
     }
+
+
+def _install_mecab_lite_compat() -> None:
+    """Keep Melo's eager Japanese import from requiring the full UniDic download.
+
+    Melo imports every language frontend even for EN, and japanese.py constructs
+    MeCab.Tagger() at import time.  Route zero-argument Tagger calls to the bundled
+    unidic-lite dictionary inside this isolated legacy worker only.
+    """
+    import MeCab
+    import unidic_lite
+
+    original_tagger = MeCab.Tagger
+
+    def tagger(*args, **kwargs):
+        if not args and not kwargs:
+            return original_tagger(f'-r /dev/null -d "{unidic_lite.DICDIR}"')
+        return original_tagger(*args, **kwargs)
+
+    MeCab.Tagger = tagger
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -36,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.text:
         return 2
     try:
+        _install_mecab_lite_compat()
         from melo.api import TTS
 
         output = args.output.resolve()
@@ -65,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
                     "generation_real_time_factor": generation_seconds / duration if duration else None,
                     "language": args.language,
                     "device": args.device,
+                    "mecab_dictionary": "unidic-lite compatibility shim",
                 }
             )
         )
