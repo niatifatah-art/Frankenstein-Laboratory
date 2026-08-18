@@ -1,0 +1,93 @@
+name: cosyvoice3-five-voices-retry
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cosyvoice3-five-voices-retry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CAST_TEXT: >-
+    I had a terrible idea. What if instead of choosing one text to speech model,
+    I just used all of them? So I made Frankenstein Laboratory. And somehow,
+    it already speaks.
+  REF_TEXT: >-
+    This is a synthetic reference voice created inside Frankenstein Laboratory
+    for controlled text to speech experiments.
+
+jobs:
+  cast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 85
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: sudo apt-get update && sudo apt-get install -y espeak-ng sox libsox-dev
+      - run: python -m pip install --upgrade uv
+      - name: Make five synthetic references
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/cosyvoice/refs
+          specs=("bm_fable:b" "am_puck:a" "am_fenrir:a" "am_michael:a" "bm_george:b")
+          i=1
+          for spec in "${specs[@]}"; do
+            voice="${spec%%:*}"; lang="${spec##*:}"
+            uv run --project engines/kokoro python engines/kokoro/runner.py \
+              --voice "$voice" --language "$lang" --text "$REF_TEXT" \
+              --output "outputs/cosyvoice/refs/$(printf '%02d' "$i")-$voice.wav" >/dev/null
+            i=$((i+1))
+          done
+      - name: Install CosyVoice3 CPU inference runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --recursive https://github.com/FunAudioLLM/CosyVoice.git /tmp/CosyVoice
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.3.1 torchaudio==2.3.1
+          grep -vE '^(--extra-index-url|deepspeed==|onnxruntime-gpu==|tensorrt-cu12|torch==|torchaudio==|openai-whisper==)' /tmp/CosyVoice/requirements.txt > /tmp/cosy-cpu-requirements.txt
+          python -m pip install -r /tmp/cosy-cpu-requirements.txt onnxruntime==1.18.0 huggingface_hub
+          python - <<'PY'
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              'FunAudioLLM/Fun-CosyVoice3-0.5B-2512',
+              local_dir='/tmp/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B'
+          )
+          PY
+      - name: Render five zero-shot voices
+        shell: bash
+        run: |
+          set +e
+          python - <<'PY' > outputs/cosyvoice/run.log 2>&1
+          import os, sys
+          from pathlib import Path
+          import torch, torchaudio
+          sys.path.insert(0, '/tmp/CosyVoice')
+          sys.path.insert(0, '/tmp/CosyVoice/third_party/Matcha-TTS')
+          from cosyvoice.cli.cosyvoice import AutoModel
+          torch.set_num_threads(2)
+          root = Path('outputs/cosyvoice')
+          model = AutoModel(
+              model_dir='/tmp/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B',
+              load_vllm=False, fp16=False
+          )
+          prompt = 'You are a helpful assistant.<|endofprompt|>' + os.environ['REF_TEXT']
+          for ref in sorted((root / 'refs').glob('*.wav')):
+              chunks = [x['tts_speech'].cpu() for x in model.inference_zero_shot(
+                  os.environ['CAST_TEXT'], prompt, str(ref), stream=False
+              )]
+              wav = torch.cat(chunks, dim=1)
+              torchaudio.save(str(root / ('cosy3-' + ref.name)), wav, model.sample_rate)
+          PY
+          echo $? > outputs/cosyvoice/exit-code.txt
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cast-cosyvoice3-5-retry
+          path: outputs/cosyvoice/
+          if-no-files-found: error
