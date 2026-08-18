@@ -1,0 +1,8 @@
+[project]
+name = "frankenstein-melotts-worker"
+version = "0.1.0"
+requires-python = ">=3.9,<3.11"
+dependencies = [
+  "melotts @ git+https://github.com/myshell-ai/MeloTTS.git",
+  "soundfile>=0.12",
+]
