@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-      - run: sudo apt-get update && sudo apt-get install -y espeak-ng unzip
+      - run: sudo apt-get update && sudo apt-get install -y espeak-ng
       - run: python -m pip install --upgrade uv
       - name: Generate two controlled synthetic references
         run: |
@@ -28,7 +28,7 @@ jobs:
             --voice am_michael \
             --text "This is the target synthetic voice created inside Frankenstein Laboratory." \
             --output outputs/target.wav
-      - name: Install only ToneColorConverter dependencies
+      - name: Install converter-only runtime and official V2 checkpoint
         shell: bash
         run: |
           set -euo pipefail
@@ -37,13 +37,20 @@ jobs:
           git -C /tmp/OpenVoice checkout 74a1d147b17a8c3092dd5430504bd83ef6c7eb23
           python -m pip install -e /tmp/OpenVoice --no-deps
           python -m pip install \
+            huggingface_hub \
             numpy==1.22.0 librosa==0.9.1 soundfile \
             eng_to_ipa==0.0.2 inflect==7.0.0 unidecode==1.3.7 \
             pypinyin==0.50.0 cn2an==0.5.22 jieba==0.42.1 langid==1.1.6
-          curl -L --fail --retry 3 \
-            https://myshell-public-repo-host.s3.amazonaws.com/openvoice/checkpoints_v2_0417.zip \
-            -o /tmp/openvoice-v2.zip
-          unzip -q /tmp/openvoice-v2.zip -d /tmp/OpenVoice
+          python - <<'PY'
+          from huggingface_hub import snapshot_download
+          path = snapshot_download(
+              repo_id='myshell-ai/OpenVoiceV2',
+              revision='fd981100305a0e4291f93a9ad169c6d9f7bed54a',
+              allow_patterns=['converter/*'],
+              local_dir='/tmp/OpenVoice/checkpoints_v2',
+          )
+          print(path)
+          PY
       - name: Attempt real tone-color conversion
         shell: bash
         run: |
@@ -77,6 +84,8 @@ jobs:
               'model_load_seconds': load_seconds,
               'conversion_seconds': time.perf_counter() - convert_started,
               'source_revision': '74a1d147b17a8c3092dd5430504bd83ef6c7eb23',
+              'checkpoint_repo': 'myshell-ai/OpenVoiceV2',
+              'checkpoint_revision': 'fd981100305a0e4291f93a9ad169c6d9f7bed54a',
               'watermark': False,
               'install_scope': 'ToneColorConverter-only',
           }))
