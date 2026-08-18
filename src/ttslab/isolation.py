@@ -36,6 +36,11 @@ _WORKER_LAYOUT: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "chatterbox_v3": ("engines/chatterbox", "runner.py", ("--variant", "v3")),
     "qwen3_custom_06b": ("engines/qwen3_tts", "runner.py", ("--variant", "custom")),
     "qwen3_base_06b": ("engines/qwen3_tts", "runner.py", ("--variant", "base")),
+    "qwen3_voice_design_17b": (
+        "engines/qwen3_tts",
+        "runner.py",
+        ("--variant", "voice_design"),
+    ),
     "voxcpm2": ("engines/voxcpm2", "runner.py", ()),
     "vibevoice_realtime": ("engines/vibevoice_realtime", "runner.py", ()),
     "melotts": ("engines/melotts", "runner.py", ()),
