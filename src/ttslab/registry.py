@@ -10,6 +10,7 @@ _ALLOWED_STATUSES = {
     "adapter_ready",
     "install_verified",
     "component",
+    "qualified_component",
     "researching",
     "planned",
     "blocked",
@@ -44,10 +45,17 @@ class EngineRecord:
     qualification_run: int | None = None
     artifact_id: int | None = None
     artifact_digest: str | None = None
+    cpu_generation_rtf: float | None = None
+    cpu_ttfa_seconds: float | None = None
+    cpu_cold_start_seconds: float | None = None
 
     @property
     def runnable(self) -> bool:
         return self.integration_status == "ready" and self.worker is not None
+
+    @property
+    def qualified_component(self) -> bool:
+        return self.integration_status == "qualified_component"
 
     def supports(self, capability: str) -> bool:
         return capability in self.capabilities
@@ -65,6 +73,11 @@ def repository_root(start: Path | None = None) -> Path:
         if (candidate / "pyproject.toml").exists() and (candidate / "registry").exists():
             return candidate
     raise RuntimeError("Could not locate repository root containing pyproject.toml and registry/")
+
+
+def _optional_float(raw: dict[str, object], key: str) -> float | None:
+    value = raw.get(key)
+    return float(value) if value is not None else None
 
 
 def _record_from_raw(key: str, raw: dict[str, object]) -> EngineRecord:
@@ -102,6 +115,9 @@ def _record_from_raw(key: str, raw: dict[str, object]) -> EngineRecord:
         artifact_digest=(
             str(raw["artifact_digest"]) if raw.get("artifact_digest") is not None else None
         ),
+        cpu_generation_rtf=_optional_float(raw, "cpu_generation_rtf"),
+        cpu_ttfa_seconds=_optional_float(raw, "cpu_ttfa_seconds"),
+        cpu_cold_start_seconds=_optional_float(raw, "cpu_cold_start_seconds"),
     )
 
 
@@ -130,6 +146,7 @@ def load_registry(path: Path | None = None) -> tuple[EngineRecord, ...]:
     source_verifications = _overlay(
         registry_path.with_name("source_verifications.toml"), "source"
     )
+    license_overrides = _overlay(registry_path.with_name("license_overrides.toml"), "license")
     raw_records: dict[str, dict[str, object]] = {}
     for static_path in _static_registry_files(registry_path):
         data = tomllib.loads(static_path.read_text(encoding="utf-8"))
@@ -142,6 +159,7 @@ def load_registry(path: Path | None = None) -> tuple[EngineRecord, ...]:
     for key, base_raw in raw_records.items():
         merged = dict(base_raw)
         merged.update(source_verifications.get(key, {}))
+        merged.update(license_overrides.get(key, {}))
         merged.update(qualifications.get(key, {}))
         records.append(_record_from_raw(key, merged))
     return tuple(sorted(records, key=lambda item: item.key))
@@ -172,8 +190,17 @@ def validate_registry(path: Path | None = None) -> tuple[str, ...]:
             errors.append(f"{record.key}: ready engine has no worker")
         if record.integration_status == "ready" and record.license_status == "unverified":
             errors.append(f"{record.key}: ready engine has unverified license status")
+        if record.integration_status == "qualified_component" and record.kind == "tts":
+            errors.append(f"{record.key}: qualified_component should not be kind='tts'")
         if record.artifact_digest and not record.artifact_digest.startswith("sha256:"):
             errors.append(f"{record.key}: artifact_digest must use sha256: prefix")
+        for metric_name, value in (
+            ("cpu_generation_rtf", record.cpu_generation_rtf),
+            ("cpu_ttfa_seconds", record.cpu_ttfa_seconds),
+            ("cpu_cold_start_seconds", record.cpu_cold_start_seconds),
+        ):
+            if value is not None and value < 0:
+                errors.append(f"{record.key}: {metric_name} must be non-negative")
     return tuple(errors)
 
 

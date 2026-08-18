@@ -11,6 +11,7 @@ class RouteRequest:
     require: tuple[str, ...] = ()
     prefer: tuple[str, ...] = ()
     allow_restricted_commercial_use: bool = False
+    max_generation_rtf: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +38,11 @@ def route_engines(
             and engine.commercial_use in {"restricted", "research_only", "prohibited"}
         ):
             continue
+        if request.max_generation_rtf is not None:
+            if engine.cpu_generation_rtf is None:
+                continue
+            if engine.cpu_generation_rtf > request.max_generation_rtf:
+                continue
 
         score = 0
         reasons: list[str] = []
@@ -47,9 +53,23 @@ def route_engines(
         if request.language and engine.supports_language(request.language):
             score += 3
             reasons.append(f"supports language {request.language}")
-        if "cpu" in engine.hardware:
-            score += 1
-            reasons.append("CPU-qualified")
+
+        if engine.cpu_generation_rtf is not None:
+            if engine.cpu_generation_rtf <= 0.5:
+                score += 20
+                reasons.append("measured CPU generation faster than 2x realtime")
+            elif engine.cpu_generation_rtf <= 1.0:
+                score += 15
+                reasons.append("measured CPU generation realtime-or-better")
+            elif engine.cpu_generation_rtf <= 2.0:
+                score += 8
+                reasons.append("measured CPU generation near realtime")
+            elif engine.cpu_generation_rtf <= 5.0:
+                score += 2
+                reasons.append("measured CPU generation below 5x realtime latency")
+            else:
+                reasons.append("CPU-qualified but measured slow")
+
         candidates.append(RouteCandidate(engine=engine, score=score, reasons=tuple(reasons)))
 
     return tuple(sorted(candidates, key=lambda item: (-item.score, item.engine.key)))

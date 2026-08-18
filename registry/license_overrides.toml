@@ -1,0 +1,64 @@
+# Date-scoped licensing corrections layered over the historical research registry.
+# Only primary upstream repositories/model cards are used here. Unknown dataset or
+# voice-asset rights stay explicitly unresolved instead of being inferred.
+
+[license.dia2]
+weights_license = "Apache-2.0"
+license_status = "verified"
+commercial_use = "allowed_with_attribution"
+attribution = "Apache-2.0 applies to the current Dia2-1B checkpoint; third-party assets retain their own licenses."
+dataset_notes = "Current checkpoint license is Apache-2.0; training-data provenance and third-party codec/assets remain separate."
+verified_on = "2026-08-18"
+restrictions = ["Do not treat third-party assets bundled or referenced by Dia2 as relicensed under Apache-2.0."]
+notes = "Current official Dia2-1B model card is Apache-2.0. Remains research-zone until product-quality and dependency audits are complete."
+
+[license.glm_tts]
+code_license = "Apache-2.0"
+weights_license = "MIT"
+license_status = "verified"
+commercial_use = "allowed_with_attribution"
+attribution = "Repository code is Apache-2.0; the current official GLM-TTS model repository declares MIT for model weights."
+verified_on = "2026-08-18"
+restrictions = ["Example prompt audio is separately licensed/research-use material; do not ship it as a product voice asset."]
+notes = "Code and model weights intentionally have different licenses. Preserve both provenance chains."
+
+[license.fireredtts2]
+code_license = "Apache-2.0"
+weights_license = "Apache-2.0"
+license_status = "verified"
+commercial_use = "allowed_with_attribution"
+attribution = "Current official repository and FireRedTTS2 model repository declare Apache-2.0."
+verified_on = "2026-08-18"
+dataset_notes = "Training-data provenance and any user-supplied reference voices remain separate."
+restrictions = []
+notes = "Current official FireRedTTS2 checkpoint is Apache-2.0; large checkpoint size and GPU-oriented runtime keep it in research until qualified."
+
+[license.spark_tts]
+weights_license = "CC-BY-NC-SA-4.0"
+license_status = "verified_with_use_restrictions"
+commercial_use = "research_only"
+attribution = "Repository code remains tracked separately; current official Spark-TTS-0.5B weights are CC-BY-NC-SA-4.0."
+verified_on = "2026-08-18"
+restrictions = ["Do not route official Spark-TTS-0.5B weights into a commercial runtime."]
+notes = "Useful architecture/reference model, but current official weights remain non-commercial."
+
+[license.higgs_audio]
+weights_license = "Boson Higgs TTS 3 Research and Non-Commercial License"
+license_status = "verified_with_use_restrictions"
+commercial_use = "research_only"
+attribution = "Current Higgs TTS 3 model requires Boson license attribution; creator-output grant is narrower than embedding the model in a product."
+verified_on = "2026-08-18"
+restrictions = [
+  "Production, hosted API, SaaS, embedding in a product/service, or reselling the model requires a separate commercial license.",
+  "Creator Use Grant may cover monetized creator content with attribution, but does not authorize shipping the model as our runtime backend.",
+]
+notes = "Keep current Higgs TTS 3 model out of product routing. Creator-output rights are not equivalent to model commercialization rights."
+
+[license.orpheus_tts]
+weights_license = "Apache-2.0"
+license_status = "partially_verified"
+commercial_use = "checkpoint_and_voice_dependent"
+attribution = "Current official Orpheus 3B fine-tuned checkpoint declares Apache-2.0; preset voice-asset rights remain a separate unresolved concern."
+verified_on = "2026-08-18"
+restrictions = ["Do not ship preset/reference voice assets until their provenance and reuse rights are independently verified."]
+notes = "Model weights are currently Apache-2.0, but VoicePack/preset-voice rights remain deliberately separate."

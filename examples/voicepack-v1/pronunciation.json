@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "term": "DevShelf",
+      "replacement": "dev shelf",
+      "mode": "text",
+      "language": "en",
+      "case_sensitive": false,
+      "whole_word": true,
+      "source": "project"
+    },
+    {
+      "term": "Yessss",
+      "replacement": "jɛːs",
+      "mode": "phoneme",
+      "language": "en",
+      "case_sensitive": false,
+      "whole_word": true,
+      "source": "user"
+    }
+  ]
+}

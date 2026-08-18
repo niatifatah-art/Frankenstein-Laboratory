@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "voice_id": "synthetic_demo",
+  "display_name": "Synthetic Demo",
+  "languages": ["en"],
+  "references": [],
+  "backend_states": [],
+  "pronunciation_lexicon": "pronunciation.json",
+  "style_presets": {
+    "excited": {"style": "excited", "pace": 1.05},
+    "calm": {"style": "calm", "pace": 0.92}
+  },
+  "provenance": {
+    "synthetic": true,
+    "note": "Schema example only; no human voice asset is bundled."
+  }
+}
