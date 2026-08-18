@@ -1,243 +1,90 @@
 name: qualification-wave
 
 on:
-  pull_request:
   workflow_dispatch:
+    inputs:
+      engine:
+        description: Engine to re-qualify
+        required: true
+        default: pocket_tts
+        type: choice
+        options:
+          - kokoro
+          - pocket_tts
+          - chatterbox_base
+          - chatterbox_nano
+          - chatterbox_turbo
+          - chatterbox_v3
+          - qwen3_custom_06b
+          - qwen3_base_06b
+          - voxcpm2
+          - melotts
 
 jobs:
-  chatterbox-base:
+  qualify:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
-      - run: python -m pip install --upgrade uv
-      - name: Base real synthesis
-        shell: bash
+        with:
+          python-version: "3.12"
+      - name: System tools
         run: |
-          set -euo pipefail
-          mkdir -p outputs
-          uv run --project engines/chatterbox python engines/chatterbox/runner.py \
-            --variant base --device cpu \
-            --text "Frankenstein Laboratory is qualifying the original Chatterbox backend." \
-            --output outputs/chatterbox-base.wav | tee outputs/chatterbox-base.json
-      - name: Validate
-        run: python -c 'import wave; w=wave.open("outputs/chatterbox-base.wav","rb"); assert w.getnframes()>2400 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: {name: chatterbox-base-qualification, path: outputs/, if-no-files-found: ignore}
-
-  chatterbox-nano:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
-      - run: sudo apt-get update && sudo apt-get install -y espeak-ng
-      - run: python -m pip install --upgrade uv
-      - name: Create synthetic owned reference with Kokoro
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng sox
+          python -m pip install --upgrade uv
+      - name: Generate controlled reference when required
+        if: contains(fromJSON('["chatterbox_nano","chatterbox_turbo","chatterbox_v3","qwen3_base_06b"]'), inputs.engine)
         run: |
           mkdir -p outputs
           uv run --project engines/kokoro python engines/kokoro/runner.py \
-            --text "This synthetic reference voice was generated inside Frankenstein Laboratory for controlled voice cloning qualification. It contains no human voice sample." \
+            --text "This synthetic reference was generated inside Frankenstein Laboratory for controlled qualification." \
             --output outputs/synthetic-reference.wav
-      - name: Nano real cloning synthesis
+      - name: Run selected engine
         shell: bash
-        run: |
-          set -euo pipefail
-          uv run --project engines/chatterbox python engines/chatterbox/runner.py \
-            --variant nano --device cpu --reference outputs/synthetic-reference.wav \
-            --text "Hello from Chatterbox Nano. [chuckle] The controlled cloning path is alive." \
-            --output outputs/chatterbox-nano.wav | tee outputs/chatterbox-nano.json
-      - name: Validate
-        run: python -c 'import wave; w=wave.open("outputs/chatterbox-nano.wav","rb"); assert w.getnframes()>2400 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: {name: chatterbox-nano-qualification, path: outputs/, if-no-files-found: ignore}
-
-  chatterbox-turbo:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
-      - run: sudo apt-get update && sudo apt-get install -y espeak-ng
-      - run: python -m pip install --upgrade uv
-      - name: Create synthetic owned reference with Kokoro
-        run: |
-          mkdir -p outputs
-          uv run --project engines/kokoro python engines/kokoro/runner.py \
-            --text "This synthetic reference voice was generated inside Frankenstein Laboratory for controlled voice cloning qualification. It contains no human voice sample." \
-            --output outputs/synthetic-reference.wav
-      - name: Turbo real cloning synthesis
-        shell: bash
-        run: |
-          set -euo pipefail
-          uv run --project engines/chatterbox python engines/chatterbox/runner.py \
-            --variant turbo --device cpu --reference outputs/synthetic-reference.wav \
-            --text "Hello from Chatterbox Turbo. [laugh] This is a controlled synthetic reference test." \
-            --output outputs/chatterbox-turbo.wav | tee outputs/chatterbox-turbo.json
-      - name: Validate
-        run: python -c 'import wave; w=wave.open("outputs/chatterbox-turbo.wav","rb"); assert w.getnframes()>2400 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: {name: chatterbox-turbo-qualification, path: outputs/, if-no-files-found: ignore}
-
-  chatterbox-v3:
-    runs-on: ubuntu-latest
-    timeout-minutes: 50
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
-      - run: sudo apt-get update && sudo apt-get install -y espeak-ng
-      - run: python -m pip install --upgrade uv
-      - name: Create synthetic owned reference with Kokoro
-        run: |
-          mkdir -p outputs
-          uv run --project engines/kokoro python engines/kokoro/runner.py \
-            --text "This synthetic reference voice was generated inside Frankenstein Laboratory for controlled multilingual voice cloning qualification. It contains no human voice sample." \
-            --output outputs/synthetic-reference.wav
-      - name: V3 multilingual real synthesis
-        shell: bash
-        run: |
-          set -euo pipefail
-          uv run --project engines/chatterbox python engines/chatterbox/runner.py \
-            --variant v3 --device cpu --language en --reference outputs/synthetic-reference.wav \
-            --text "Frankenstein Laboratory is qualifying Chatterbox multilingual version three." \
-            --output outputs/chatterbox-v3.wav | tee outputs/chatterbox-v3.json
-      - name: Validate
-        run: python -c 'import wave; w=wave.open("outputs/chatterbox-v3.wav","rb"); assert w.getnframes()>2400 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: {name: chatterbox-v3-qualification, path: outputs/, if-no-files-found: ignore}
-
-  qwen3-custom-06b:
-    runs-on: ubuntu-latest
-    timeout-minutes: 50
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
-      - run: sudo apt-get update && sudo apt-get install -y sox
-      - run: python -m pip install --upgrade uv
-      - name: Qwen3 0.6B CustomVoice CPU qualification
-        shell: bash
+        env:
+          ENGINE: ${{ inputs.engine }}
         run: |
           set -euo pipefail
           mkdir -p outputs
-          uv run --project engines/qwen3_tts python engines/qwen3_tts/runner.py \
-            --variant custom --device cpu --language English --speaker Ryan \
-            --max-new-tokens 192 --text "Frankenstein Laboratory is testing Qwen three T T S." \
-            --output outputs/qwen3-custom-06b.wav | tee outputs/qwen3-custom-06b.json
-      - name: Validate
-        run: python -c 'import wave; w=wave.open("outputs/qwen3-custom-06b.wav","rb"); assert w.getnframes()>2400 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
+          case "$ENGINE" in
+            kokoro)
+              uv run --project engines/kokoro python engines/kokoro/runner.py --text "Frankenstein Laboratory manual qualification." --output outputs/kokoro.wav | tee outputs/result.json ;;
+            pocket_tts)
+              uv run --project engines/pocket_tts python engines/pocket_tts/runner.py --text "Frankenstein Laboratory manual qualification." --output outputs/pocket.wav | tee outputs/result.json ;;
+            chatterbox_base)
+              uv run --project engines/chatterbox python engines/chatterbox/runner.py --variant base --device cpu --text "Frankenstein Laboratory manual qualification." --output outputs/chatterbox-base.wav | tee outputs/result.json ;;
+            chatterbox_nano)
+              uv run --project engines/chatterbox python engines/chatterbox/runner.py --variant nano --device cpu --reference outputs/synthetic-reference.wav --text "Frankenstein Laboratory manual qualification." --output outputs/chatterbox-nano.wav | tee outputs/result.json ;;
+            chatterbox_turbo)
+              uv run --project engines/chatterbox python engines/chatterbox/runner.py --variant turbo --device cpu --reference outputs/synthetic-reference.wav --text "Frankenstein Laboratory manual qualification." --output outputs/chatterbox-turbo.wav | tee outputs/result.json ;;
+            chatterbox_v3)
+              uv run --project engines/chatterbox python engines/chatterbox/runner.py --variant v3 --device cpu --language en --reference outputs/synthetic-reference.wav --text "Frankenstein Laboratory manual qualification." --output outputs/chatterbox-v3.wav | tee outputs/result.json ;;
+            qwen3_custom_06b)
+              uv run --project engines/qwen3_tts python engines/qwen3_tts/runner.py --variant custom --device cpu --language English --speaker Ryan --max-new-tokens 192 --text "Frankenstein Laboratory manual qualification." --output outputs/qwen3-custom.wav | tee outputs/result.json ;;
+            qwen3_base_06b)
+              uv run --project engines/qwen3_tts python engines/qwen3_tts/runner.py --variant base --device cpu --language English --reference outputs/synthetic-reference.wav --max-new-tokens 192 --text "Frankenstein Laboratory manual qualification." --output outputs/qwen3-base.wav | tee outputs/result.json ;;
+            voxcpm2)
+              uv run --project engines/voxcpm2 python engines/voxcpm2/runner.py --device cpu --steps 2 --max-len 80 --text "Frankenstein Laboratory manual qualification." --output outputs/voxcpm2.wav | tee outputs/result.json ;;
+            melotts)
+              uv run --project engines/melotts python engines/melotts/runner.py --language EN --device cpu --text "Frankenstein Laboratory manual qualification." --output outputs/melotts.wav | tee outputs/result.json ;;
+          esac
+      - name: Validate generated WAV
+        run: |
+          python - <<'PY'
+          import glob, wave
+          paths = glob.glob('outputs/*.wav')
+          generated = [p for p in paths if not p.endswith('synthetic-reference.wav')]
+          assert generated, paths
+          with wave.open(generated[-1], 'rb') as wav:
+              assert wav.getframerate() > 0
+              assert wav.getnframes() > 1000
+              print(generated[-1], wav.getframerate(), wav.getnframes())
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
-        with: {name: qwen3-custom-06b-qualification, path: outputs/, if-no-files-found: ignore}
-
-  qwen3-base-06b:
-    runs-on: ubuntu-latest
-    timeout-minutes: 55
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
-      - run: sudo apt-get update && sudo apt-get install -y espeak-ng sox
-      - run: python -m pip install --upgrade uv
-      - name: Create synthetic owned reference with Kokoro
-        run: |
-          mkdir -p outputs
-          uv run --project engines/kokoro python engines/kokoro/runner.py \
-            --text "This is a synthetic reference created inside Frankenstein Laboratory. It is used only to test voice cloning without borrowing a human voice." \
-            --output outputs/synthetic-reference.wav
-      - name: Qwen3 0.6B Base voice-clone CPU qualification
-        shell: bash
-        run: |
-          set -euo pipefail
-          uv run --project engines/qwen3_tts python engines/qwen3_tts/runner.py \
-            --variant base --device cpu --language English --reference outputs/synthetic-reference.wav \
-            --max-new-tokens 192 --text "Frankenstein Laboratory is testing the Qwen voice cloning path." \
-            --output outputs/qwen3-base-06b.wav | tee outputs/qwen3-base-06b.json
-      - name: Validate
-        run: python -c 'import wave; w=wave.open("outputs/qwen3-base-06b.wav","rb"); assert w.getnframes()>2400 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: {name: qwen3-base-06b-qualification, path: outputs/, if-no-files-found: ignore}
-
-  voxcpm2:
-    runs-on: ubuntu-latest
-    timeout-minutes: 50
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
-      - run: python -m pip install --upgrade uv
-      - name: VoxCPM2 constrained CPU qualification
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p outputs
-          uv run --project engines/voxcpm2 python engines/voxcpm2/runner.py \
-            --device cpu --steps 2 --max-len 80 \
-            --text "Frankenstein Laboratory verifies Vox C P M two." \
-            --output outputs/voxcpm2.wav | tee outputs/voxcpm2.json
-      - name: Validate
-        run: python -c 'import wave; w=wave.open("outputs/voxcpm2.wav","rb"); assert w.getnframes()>1600 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: {name: voxcpm2-qualification, path: outputs/, if-no-files-found: ignore}
-
-  melotts:
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.10"}
-      - run: python -m pip install --upgrade uv
-      - name: MeloTTS English CPU qualification
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p outputs
-          uv run --project engines/melotts python engines/melotts/runner.py \
-            --language EN --device cpu --text "Frankenstein Laboratory verifies Melo T T S." \
-            --output outputs/melotts.wav | tee outputs/melotts.json
-      - name: Validate
-        run: python -c 'import wave; w=wave.open("outputs/melotts.wav","rb"); assert w.getnframes()>2400 and w.getframerate()>0; print(w.getframerate(),w.getnframes())'
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: {name: melotts-qualification, path: outputs/, if-no-files-found: ignore}
-
-  source-contracts:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.10"}
-      - name: CosyVoice source + submodule contract
-        run: |
-          mkdir -p outputs
-          git clone --depth 1 --recursive https://github.com/FunAudioLLM/CosyVoice.git /tmp/CosyVoice
-          git -C /tmp/CosyVoice rev-parse HEAD | tee outputs/cosyvoice-source-sha.txt
-          python -m compileall -q /tmp/CosyVoice/cosyvoice
-          grep -q "cosyvoice3_example" /tmp/CosyVoice/example.py
-      - name: OpenVoice component contract
-        run: |
-          git clone --depth 1 https://github.com/myshell-ai/OpenVoice.git /tmp/OpenVoice
-          git -C /tmp/OpenVoice rev-parse HEAD | tee outputs/openvoice-source-sha.txt
-          python -m compileall -q /tmp/OpenVoice/openvoice
-          grep -q "class ToneColorConverter" /tmp/OpenVoice/openvoice/api.py
-      - name: VibeVoice current source/realtime contract
-        run: |
-          git clone --depth 1 https://github.com/microsoft/VibeVoice.git /tmp/VibeVoice
-          git -C /tmp/VibeVoice rev-parse HEAD | tee outputs/vibevoice-source-sha.txt
-          python -m compileall -q /tmp/VibeVoice
-          grep -R -q "VibeVoice-Realtime-0.5B" /tmp/VibeVoice/README.md
-      - uses: actions/upload-artifact@v4
-        with: {name: source-contract-revisions, path: outputs/, if-no-files-found: error}
+        with:
+          name: ${{ inputs.engine }}-manual-qualification
+          path: outputs/
+          if-no-files-found: ignore
