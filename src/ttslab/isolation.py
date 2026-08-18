@@ -17,6 +17,7 @@ class IsolatedWorker:
 
 WORKERS = {
     "kokoro": ("engines/kokoro", "runner.py"),
+    "pocket_tts": ("engines/pocket_tts", "runner.py"),
 }
 
 

@@ -11,4 +11,4 @@ def test_list_command_succeeds(capsys) -> None:
 def test_run_refuses_unverified_adapter(capsys) -> None:
     assert main(["run", "pocket_tts", "--text", "hello"]) == 3
     error = capsys.readouterr().err
-    assert "planned" in error
+    assert "adapter_ready" in error

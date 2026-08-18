@@ -17,11 +17,12 @@ notes = "82M lightweight backend. Two real-model CPU smoke runs passed on GitHub
 name = "Pocket TTS"
 upstream = "https://github.com/kyutai-labs/pocket-tts"
 zone = "runtime"
-integration_status = "planned"
+integration_status = "adapter_ready"
 code_license = "MIT"
 weights_license = "CC-BY-4.0"
 license_status = "partially_verified"
-notes = "CPU-first, streaming and voice-cloning candidate. Model weights carry acceptable-use terms; voice assets have separate per-source licenses."
+worker = "pocket_tts"
+notes = "2.1.0 CPU-first streaming adapter staged for real-model smoke. Model weights carry acceptable-use terms; voice assets have separate per-source licenses."
 
 [engine.chatterbox]
 name = "Chatterbox"
