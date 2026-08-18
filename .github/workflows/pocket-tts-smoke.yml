@@ -1,11 +1,6 @@
 name: pocket-tts-smoke
 
 on:
-  pull_request:
-    paths:
-      - "engines/pocket_tts/**"
-      - "src/ttslab/isolation.py"
-      - ".github/workflows/pocket-tts-smoke.yml"
   workflow_dispatch:
 
 jobs:

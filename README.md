@@ -6,7 +6,10 @@ This is not a "30 models behind one UI" project. The laboratory is expected to p
 
 ## Current phase
 
-The Core is bootstrapped and the first external backend, **Kokoro**, has passed real-model CPU smoke tests through an isolated worker.
+The Core is bootstrapped and two external CPU backends have passed real-model smoke tests through isolated workers:
+
+- **Kokoro** — lightweight 82M baseline
+- **Pocket TTS 2.1.0** — streaming, voice-state capable CPU backend
 
 The repository currently contains:
 
@@ -14,7 +17,7 @@ The repository currently contains:
 - a machine-readable engine/provenance registry
 - an environment doctor
 - an isolated-worker boundary based on `uv` + subprocesses
-- a verified Kokoro worker using CPU-only PyTorch resolution
+- verified Kokoro and Pocket TTS workers using CPU-only PyTorch resolution
 - structured real-model smoke evidence
 - lightweight contract/registry/CLI tests
 - lightweight CI
@@ -30,13 +33,14 @@ python -m ttslab doctor
 pytest
 ```
 
-Run the first verified backend:
+Run verified backends:
 
 ```bash
 python -m ttslab run kokoro --text "hello world" --output outputs/kokoro.wav
+python -m ttslab run pocket_tts --text "hello world" --output outputs/pocket.wav
 ```
 
-Kokoro lives in its own `uv` project under `engines/kokoro/`; its PyTorch dependency is pinned to the CPU wheel index on Linux/Windows so a CPU install does not drag in CUDA packages.
+Each engine lives in its own `uv` project. CPU PyTorch is pinned on Linux/Windows so CPU installs do not drag in CUDA packages.
 
 Experimental workers use the explicit smoke path until qualified:
 
@@ -46,7 +50,7 @@ python -m ttslab smoke <engine> --text "hello world"
 
 ## Next vertical slice
 
-Pocket TTS is the next lightweight backend to qualify, followed by Chatterbox. Once the adapter boundary is proven across multiple engines, the laboratory expands toward Qwen3-TTS, CosyVoice, VoxCPM2, and research-only systems.
+Chatterbox is next. Nano is especially interesting for CPU/on-device use, but its official cloning example requires a reference clip; the laboratory will use an explicitly licensed or synthetic reference rather than silently pulling a human voice sample. After the lightweight adapter boundary is proven, the laboratory expands toward Qwen3-TTS, CosyVoice, VoxCPM2, and research-only systems.
 
 ## Principles
 

@@ -1,0 +1,55 @@
+{
+  "kind": "real_model_streaming_smoke",
+  "engine": "pocket_tts",
+  "engine_package_version": "2.1.0",
+  "date": "2026-08-18",
+  "source_commit": "2e2d47ce8a3d1ebaa962035eb2bf3c12102fc158",
+  "github_actions_run_id": 32176431354,
+  "github_actions_job_id": 95839341305,
+  "artifact_id": 9339195954,
+  "artifact_name": "pocket-tts-smoke-audio",
+  "artifact_digest": "sha256:cc5164b5c9ce429a1f184abf4351cc2414a1a0dedae5a489ab856bc37e489217",
+  "environment": {
+    "os": "Ubuntu 24.04.4 LTS",
+    "runner_image": "ubuntu-24.04",
+    "runner_image_version": "20260810.271.1",
+    "python": "3.12.13",
+    "uv": "0.12.5",
+    "device_class": "GitHub-hosted CPU runner",
+    "torch_source": "https://download.pytorch.org/whl/cpu"
+  },
+  "input": {
+    "text": "Hello from Frankenstein Laboratory. This is the first real Pocket TTS smoke test.",
+    "voice": "alba",
+    "voice_license": "CC-BY-4.0 according to upstream voice catalog",
+    "language": "english",
+    "quantize": false
+  },
+  "output": {
+    "sample_rate_hz": 24000,
+    "audio_duration_seconds": 4.88,
+    "wav_bytes": 234284,
+    "stream_chunks": 61
+  },
+  "timing": {
+    "model_load_seconds": 4.403896139000004,
+    "voice_prepare_seconds": 1.2227663759999956,
+    "time_to_first_audio_seconds": 0.1584713339999979,
+    "generation_seconds": 1.640424797999998,
+    "total_seconds": 7.267089464999998,
+    "generation_real_time_factor": 0.3361526225409832,
+    "cold_real_time_factor": 1.489157677254098
+  },
+  "validation": {
+    "synthesis_exit": "success",
+    "streaming_chunks_received": "success",
+    "wav_header": "success",
+    "artifact_upload": "success"
+  },
+  "observations": [
+    "This is a functional streaming smoke, not a subjective quality benchmark.",
+    "TTFA is measured from generation start after model and voice preparation.",
+    "Generation RTF excludes model loading and voice-state preparation; cold RTF includes them.",
+    "The smoke used an upstream predefined voice and does not bundle that voice asset into this repository."
+  ]
+}

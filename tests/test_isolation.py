@@ -14,10 +14,10 @@ def test_kokoro_worker_is_registered_and_ready() -> None:
     assert record.integration_status == "ready"
 
 
-def test_pocket_worker_is_registered_for_smoke() -> None:
+def test_pocket_worker_is_registered_and_ready() -> None:
     record = get_engine("pocket_tts", REGISTRY)
     assert record.worker == "pocket_tts"
-    assert record.integration_status == "adapter_ready"
+    assert record.integration_status == "ready"
 
 
 def test_unknown_worker_fails_explicitly() -> None:
