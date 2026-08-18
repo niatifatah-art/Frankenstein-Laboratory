@@ -54,6 +54,12 @@ artifact_digest = "sha256:38215edf31961a9842a76f3779cff6ee52eb0b6a05754186b19a12
 hardware = ["cpu", "cuda_recommended"]
 notes = "Qualified voice cloning on GitHub Ubuntu CPU using a synthetic Kokoro reference owned by the lab. 3.76 s PCM/24 kHz audio; load 13.39 s; generation 131.15 s; generation RTF 34.88. Functional on CPU but CUDA is strongly preferred."
 
+[qualification.qwen3_voice_design_17b]
+integration_status = "adapter_ready"
+worker = "qwen3_voice_design_17b"
+hardware = ["cpu_probe", "cuda_recommended"]
+notes = "Official 1.7B VoiceDesign API is implemented in the isolated Qwen worker. Promotion is blocked on the dedicated capacity probe until real PCM audio is produced and retained."
+
 [qualification.voxcpm2]
 integration_status = "ready"
 qualification_run = 32180309921
