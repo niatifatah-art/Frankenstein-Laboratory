@@ -13,7 +13,11 @@ def describe() -> dict[str, object]:
         "schema_version": 1,
         "engine": "melotts",
         "adapter_version": "0.1.0",
-        "capabilities": {"cpu": True, "multilingual": True, "languages": ["EN", "ES", "FR", "ZH", "JP", "KR"]},
+        "capabilities": {
+            "cpu": True,
+            "multilingual": True,
+            "languages": ["EN", "ES", "FR", "ZH", "JP", "KR"],
+        },
     }
 
 
@@ -65,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         return 0
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(json.dumps({"error": type(exc).__name__, "message": str(exc)}), file=sys.stderr)
         return 5
 
