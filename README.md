@@ -28,13 +28,19 @@ python -m ttslab doctor
 pytest
 ```
 
-A registered-but-untested engine intentionally fails:
+A registered-but-unverified engine intentionally fails through the normal path:
 
 ```bash
 python -m ttslab run kokoro --text "hello world"
 ```
 
-It will become runnable only after an isolated adapter has been installed and smoke-tested.
+Experimental workers can be invoked explicitly while they are being qualified:
+
+```bash
+python -m ttslab smoke kokoro --text "hello world" --output outputs/kokoro.wav
+```
+
+The first Kokoro worker uses its own `uv` project under `engines/kokoro/`; it is not promoted to `ready` until a real-model smoke run passes.
 
 ## Next milestone
 

@@ -15,6 +15,7 @@ class EngineRecord:
     code_license: str
     weights_license: str
     license_status: str
+    worker: str | None = None
     notes: str = ""
 
 
@@ -41,6 +42,7 @@ def load_registry(path: Path | None = None) -> tuple[EngineRecord, ...]:
                 code_license=raw.get("code_license", "unknown"),
                 weights_license=raw.get("weights_license", "unknown"),
                 license_status=raw.get("license_status", "unverified"),
+                worker=raw.get("worker"),
                 notes=raw.get("notes", ""),
             )
         )

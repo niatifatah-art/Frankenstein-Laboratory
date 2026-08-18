@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 
 from .doctor import inspect_environment
+from .isolation import run_worker
 from .registry import get_engine, load_registry
 
 
@@ -35,20 +36,63 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
     if engine.integration_status != "ready":
         print(
-            f"{engine.name} is registered but not runnable yet "
+            f"{engine.name} is registered but not production-runnable yet "
             f"(status={engine.integration_status}).",
             file=sys.stderr,
         )
         print(
-            "The laboratory intentionally refuses to fake an integration. "
-            "Add and test an isolated adapter before marking it ready.",
+            "Use the explicit experimental smoke path until a real-model run has passed.",
             file=sys.stderr,
         )
         return 3
 
-    # Deliberately not pretending a model integration exists before one is tested.
-    print(f"Adapter for {engine.name} is marked ready but has no dispatcher.", file=sys.stderr)
-    return 4
+    if not engine.worker:
+        print(f"{engine.name} has no isolated worker configured.", file=sys.stderr)
+        return 4
+
+    try:
+        return run_worker(
+            engine.worker,
+            text=args.text,
+            output=args.output,
+            extra_args=args.engine_arg,
+        )
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 5
+
+
+def _cmd_smoke(args: argparse.Namespace) -> int:
+    try:
+        engine = get_engine(args.engine)
+    except KeyError:
+        print(f"Unknown engine: {args.engine}", file=sys.stderr)
+        return 2
+    if not engine.worker:
+        print(f"{engine.name} has no isolated worker configured.", file=sys.stderr)
+        return 4
+    try:
+        return run_worker(
+            engine.worker,
+            text=args.text,
+            output=args.output,
+            extra_args=args.engine_arg,
+        )
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 5
+
+
+def _add_generation_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("engine")
+    parser.add_argument("--text", required=True)
+    parser.add_argument("--output", type=Path, default=Path("tts_output.wav"))
+    parser.add_argument(
+        "--engine-arg",
+        action="append",
+        default=[],
+        help="Pass one raw argument to the isolated worker. Repeat for multiple arguments.",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -61,11 +105,16 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser = sub.add_parser("doctor", help="Inspect the local runtime.")
     doctor_parser.set_defaults(func=_cmd_doctor)
 
-    run_parser = sub.add_parser("run", help="Run a tested isolated engine adapter.")
-    run_parser.add_argument("engine")
-    run_parser.add_argument("--text", required=True)
-    run_parser.add_argument("--output", type=Path, default=Path("tts_output.wav"))
+    run_parser = sub.add_parser("run", help="Run a verified engine adapter.")
+    _add_generation_args(run_parser)
     run_parser.set_defaults(func=_cmd_run)
+
+    smoke_parser = sub.add_parser(
+        "smoke",
+        help="Explicitly run an experimental worker before it is promoted to ready.",
+    )
+    _add_generation_args(smoke_parser)
+    smoke_parser.set_defaults(func=_cmd_smoke)
     return parser
 
 

@@ -6,10 +6,11 @@
 name = "Kokoro"
 upstream = "https://github.com/hexgrad/kokoro"
 zone = "runtime"
-integration_status = "planned"
+integration_status = "adapter_ready"
 code_license = "Apache-2.0"
 weights_license = "Apache-2.0"
 license_status = "partially_verified"
+worker = "kokoro"
 notes = "82M lightweight candidate. Verify model-card/dataset provenance before shipping."
 
 [engine.pocket_tts]
