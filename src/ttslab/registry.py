@@ -40,6 +40,10 @@ class EngineRecord:
     languages: tuple[str, ...] = ()
     hardware: tuple[str, ...] = ()
     restrictions: tuple[str, ...] = ()
+    source_revision: str | None = None
+    qualification_run: int | None = None
+    artifact_id: int | None = None
+    artifact_digest: str | None = None
 
     @property
     def runnable(self) -> bool:
@@ -86,13 +90,42 @@ def _record_from_raw(key: str, raw: dict[str, object]) -> EngineRecord:
         languages=tuple(str(item) for item in raw.get("languages", [])),
         hardware=tuple(str(item) for item in raw.get("hardware", [])),
         restrictions=tuple(str(item) for item in raw.get("restrictions", [])),
+        source_revision=(
+            str(raw["source_revision"]) if raw.get("source_revision") is not None else None
+        ),
+        qualification_run=(
+            int(raw["qualification_run"])
+            if raw.get("qualification_run") is not None
+            else None
+        ),
+        artifact_id=int(raw["artifact_id"]) if raw.get("artifact_id") is not None else None,
+        artifact_digest=(
+            str(raw["artifact_digest"]) if raw.get("artifact_digest") is not None else None
+        ),
     )
+
+
+def _qualification_overrides(registry_path: Path) -> dict[str, dict[str, object]]:
+    path = registry_path.with_name("qualifications.toml")
+    if not path.exists():
+        return {}
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    return {
+        str(key): dict(value)
+        for key, value in data.get("qualification", {}).items()
+        if isinstance(value, dict)
+    }
 
 
 def load_registry(path: Path | None = None) -> tuple[EngineRecord, ...]:
     registry_path = path or repository_root() / "registry" / "engines.toml"
     data = tomllib.loads(registry_path.read_text(encoding="utf-8"))
-    records = [_record_from_raw(key, raw) for key, raw in data.get("engine", {}).items()]
+    overrides = _qualification_overrides(registry_path)
+    records = []
+    for key, base_raw in data.get("engine", {}).items():
+        merged = dict(base_raw)
+        merged.update(overrides.get(key, {}))
+        records.append(_record_from_raw(key, merged))
     return tuple(sorted(records, key=lambda item: item.key))
 
 
@@ -117,6 +150,8 @@ def validate_registry(path: Path | None = None) -> tuple[str, ...]:
             errors.append(f"{record.key}: ready engine has no worker")
         if record.integration_status == "ready" and record.license_status == "unverified":
             errors.append(f"{record.key}: ready engine has unverified license status")
+        if record.artifact_digest and not record.artifact_digest.startswith("sha256:"):
+            errors.append(f"{record.key}: artifact_digest must use sha256: prefix")
     return tuple(errors)
 
 
