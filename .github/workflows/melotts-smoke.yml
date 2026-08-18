@@ -1,10 +1,6 @@
 name: melotts-smoke
 
 on:
-  pull_request:
-    paths:
-      - "engines/melotts/**"
-      - ".github/workflows/melotts-smoke.yml"
   workflow_dispatch:
 
 jobs:
