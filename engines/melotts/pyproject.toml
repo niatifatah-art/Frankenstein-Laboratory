@@ -1,10 +1,11 @@
 [project]
 name = "frankenstein-melotts-worker"
-version = "0.2.1"
+version = "0.2.3"
 requires-python = ">=3.9,<3.11"
 dependencies = [
   "melotts @ git+https://github.com/myshell-ai/MeloTTS.git@209145371cff8fc3bd60d7be902ea69cbdb7965a",
   "setuptools<81",
+  "nltk==3.8.1",
   "mecab-python3",
   "unidic-lite==1.0.8",
   "torch",
