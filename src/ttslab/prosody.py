@@ -46,7 +46,7 @@ class ProsodyTimeline:
             raise ValueError("Prosody events must be sorted by at_ms.")
 
     @classmethod
-    def from_json(cls, path: Path) -> "ProsodyTimeline":
+    def from_json(cls, path: Path) -> ProsodyTimeline:
         raw = json.loads(path.read_text(encoding="utf-8"))
         if raw.get("schema_version") != 1:
             raise ValueError("Unsupported prosody timeline schema.")
