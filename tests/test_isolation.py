@@ -1,10 +1,8 @@
 from pathlib import Path
 
 import pytest
-
 from ttslab.isolation import get_worker
 from ttslab.registry import get_engine
-
 
 REGISTRY = Path(__file__).parents[1] / "registry" / "engines.toml"
 

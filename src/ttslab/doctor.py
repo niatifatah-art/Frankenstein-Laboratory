@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import platform
 import shutil
 import sys
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)

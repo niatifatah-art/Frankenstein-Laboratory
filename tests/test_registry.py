@@ -2,7 +2,6 @@ from pathlib import Path
 
 from ttslab.registry import get_engine, load_registry
 
-
 REGISTRY = Path(__file__).parents[1] / "registry" / "engines.toml"
 
 

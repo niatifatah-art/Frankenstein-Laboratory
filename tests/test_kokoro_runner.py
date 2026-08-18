@@ -1,8 +1,7 @@
 import json
-from pathlib import Path
 import subprocess
 import sys
-
+from pathlib import Path
 
 RUNNER = Path(__file__).parents[1] / "engines" / "kokoro" / "runner.py"
 
