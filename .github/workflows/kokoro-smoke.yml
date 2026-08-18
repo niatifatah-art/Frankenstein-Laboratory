@@ -1,8 +1,7 @@
 name: kokoro-smoke
 
 on:
-  push:
-    branches: ["bootstrap/tts-lab-core"]
+  pull_request:
     paths:
       - "engines/kokoro/**"
       - "src/ttslab/isolation.py"

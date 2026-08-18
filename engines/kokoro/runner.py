@@ -70,7 +70,7 @@ def synthesize(args: argparse.Namespace) -> int:
         return 5
 
     waveform = np.concatenate(chunks)
-    sf.write(output, waveform, SAMPLE_RATE)
+    sf.write(output, waveform, SAMPLE_RATE, subtype="PCM_16")
 
     total_seconds = time.perf_counter() - started
     audio_duration = len(waveform) / SAMPLE_RATE
