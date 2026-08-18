@@ -32,6 +32,13 @@ def test_research_catalog_never_becomes_routable_by_accident() -> None:
             assert not engine.runnable
 
 
+def test_all_research_sources_are_pinned_after_sweep() -> None:
+    research = [engine for engine in load_registry(REGISTRY) if engine.zone == "research"]
+    assert research
+    assert all(engine.source_revision and len(engine.source_revision) == 40 for engine in research)
+    assert all(engine.qualification_run == 32183788463 for engine in research)
+
+
 def test_restricted_models_are_explicit() -> None:
     f5 = get_engine("f5_tts", REGISTRY)
     fish = get_engine("fish_speech", REGISTRY)
