@@ -14,14 +14,19 @@ def describe() -> dict[str, object]:
     return {
         "schema_version": SCHEMA_VERSION,
         "engine": "kokoro",
-        "adapter_version": "0.1.0",
+        "adapter_version": "0.2.0",
         "capabilities": {
             "cpu": True,
             "streaming": True,
             "voice_cloning": False,
             "voice_design": False,
-            "phoneme_input": True,
+            "raw_phoneme_input": True,
+            "phoneme_override": False,
             "languages": ["a", "b", "e", "f", "h", "i", "j", "p", "z"],
+        },
+        "notes": {
+            "raw_phoneme_input": "Uses upstream KPipeline.generate_from_tokens with a complete raw phoneme string.",
+            "phoneme_override": "Mixed text + local phoneme replacement is not yet integrated by this adapter.",
         },
     }
 
@@ -48,19 +53,37 @@ def synthesize(args: argparse.Namespace) -> int:
     pipeline = KPipeline(lang_code=args.language)
     model_ready_seconds = time.perf_counter() - started
 
-    generator = pipeline(
-        args.text,
-        voice=args.voice,
-        speed=args.speed,
-        split_pattern=args.split_pattern,
-    )
+    if args.phonemes:
+        generator = pipeline.generate_from_tokens(
+            tokens=args.phonemes,
+            voice=args.voice,
+            speed=args.speed,
+        )
+        input_mode = "raw_phonemes"
+    else:
+        generator = pipeline(
+            args.text,
+            voice=args.voice,
+            speed=args.speed,
+            split_pattern=args.split_pattern,
+        )
+        input_mode = "text"
 
     chunks = []
     first_audio_seconds = None
     segment_count = 0
-    for _graphemes, _phonemes, audio in generator:
+    observed_phonemes: list[str] = []
+    for result in generator:
         if first_audio_seconds is None:
             first_audio_seconds = time.perf_counter() - started
+        audio = getattr(result, "audio", None)
+        phonemes = getattr(result, "phonemes", None)
+        if audio is None and isinstance(result, tuple):
+            _graphemes, phonemes, audio = result
+        if audio is None:
+            continue
+        if phonemes:
+            observed_phonemes.append(str(phonemes))
         chunks.append(np.asarray(_audio_to_numpy(audio), dtype=np.float32))
         segment_count += 1
 
@@ -87,6 +110,8 @@ def synthesize(args: argparse.Namespace) -> int:
         "voice": args.voice,
         "language": args.language,
         "speed": args.speed,
+        "input_mode": input_mode,
+        "observed_phonemes": observed_phonemes,
     }
     print(json.dumps(result, ensure_ascii=False))
     return 0
@@ -95,7 +120,9 @@ def synthesize(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Isolated Kokoro worker for Frankenstein Laboratory.")
     parser.add_argument("--describe", action="store_true")
-    parser.add_argument("--text")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--text")
+    source.add_argument("--phonemes")
     parser.add_argument("--output", type=Path, default=Path("outputs/kokoro.wav"))
     parser.add_argument("--voice", default="af_heart")
     parser.add_argument("--language", default="a")
@@ -109,8 +136,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.describe:
         print(json.dumps(describe(), ensure_ascii=False))
         return 0
-    if not args.text:
-        print("--text is required unless --describe is used.", file=sys.stderr)
+    if not args.text and not args.phonemes:
+        print("--text or --phonemes is required unless --describe is used.", file=sys.stderr)
         return 2
     return synthesize(args)
 
