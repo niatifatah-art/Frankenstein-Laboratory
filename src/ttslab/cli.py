@@ -9,15 +9,22 @@ from pathlib import Path
 from .benchmark import benchmark_case, load_corpus, write_result
 from .doctor import inspect_environment
 from .isolation import execute_worker, run_worker
+from .pipeline import build_synthesis_plan
+from .pronunciation import PronunciationLexicon
+from .prosody import ProsodyTimeline, parse_control_markup
 from .registry import get_engine, load_registry, validate_registry
 from .router import RouteRequest, route_engines
+from .text_engine import prepare_text
+from .voicepack import VoicePack
 
 
 def _cmd_list(_: argparse.Namespace) -> int:
     for engine in load_registry():
+        rtf = f"{engine.cpu_generation_rtf:.3f}" if engine.cpu_generation_rtf is not None else "unknown"
         print(
-            f"{engine.key:22} zone={engine.zone:8} kind={engine.kind:16} "
-            f"status={engine.integration_status:16} license={engine.license_status}"
+            f"{engine.key:24} zone={engine.zone:8} kind={engine.kind:16} "
+            f"status={engine.integration_status:19} cpu_rtf={rtf:8} "
+            f"license={engine.license_status}"
         )
     return 0
 
@@ -150,6 +157,7 @@ def _cmd_route(args: argparse.Namespace) -> int:
         require=tuple(args.require),
         prefer=tuple(args.prefer),
         allow_restricted_commercial_use=args.allow_restricted_commercial_use,
+        max_generation_rtf=args.max_generation_rtf,
     )
     candidates = route_engines(request)
     if not candidates:
@@ -157,7 +165,105 @@ def _cmd_route(args: argparse.Namespace) -> int:
         return 1
     for item in candidates:
         reason = "; ".join(item.reasons) if item.reasons else "qualified"
-        print(f"{item.engine.key:22} score={item.score:3} {reason}")
+        print(f"{item.engine.key:24} score={item.score:3} {reason}")
+    return 0
+
+
+def _load_lexicon(path: Path | None) -> PronunciationLexicon | None:
+    return PronunciationLexicon.from_json(path) if path else None
+
+
+def _cmd_text(args: argparse.Namespace) -> int:
+    lexicon = _load_lexicon(args.lexicon)
+    clean, markers = parse_control_markup(args.text)
+    prepared = prepare_text(clean, language=args.language, lexicon=lexicon)
+    payload = {
+        "original": prepared.original,
+        "normalized": prepared.normalized,
+        "segments": list(prepared.segments),
+        "script_hints": list(prepared.script_hints),
+        "pronunciation_overrides": [asdict(item) for item in prepared.pronunciation_overrides],
+        "control_markers": [asdict(item) for item in markers],
+    }
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def _cmd_lexicon_check(args: argparse.Namespace) -> int:
+    lexicon = PronunciationLexicon.from_json(args.path)
+    print(json.dumps({"schema_version": 1, "entries": len(lexicon.entries)}))
+    return 0
+
+
+def _cmd_prosody_check(args: argparse.Namespace) -> int:
+    timeline = ProsodyTimeline.from_json(args.path)
+    print(json.dumps({"schema_version": 1, "events": len(timeline.events)}))
+    return 0
+
+
+def _cmd_voicepack_check(args: argparse.Namespace) -> int:
+    pack = VoicePack.load(args.root)
+    errors = pack.validate_files(args.root, verify_hashes=not args.skip_hashes)
+    payload = {
+        "voice_id": pack.voice_id,
+        "display_name": pack.display_name,
+        "references": len(pack.references),
+        "backend_states": len(pack.backend_states),
+        "errors": list(errors),
+    }
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0 if not errors else 1
+
+
+def _parse_controls(values: list[str]) -> dict[str, object]:
+    controls: dict[str, object] = {}
+    for raw in values:
+        if "=" not in raw:
+            raise ValueError(f"Control must be key=value: {raw!r}")
+        key, value = raw.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise ValueError("Control key must not be empty.")
+        try:
+            controls[key] = json.loads(value)
+        except json.JSONDecodeError:
+            controls[key] = value
+    return controls
+
+
+def _cmd_plan(args: argparse.Namespace) -> int:
+    try:
+        controls = _parse_controls(args.control)
+        plan = build_synthesis_plan(
+            args.text,
+            language=args.language,
+            explicit_engine=args.engine,
+            controls=controls,
+            lexicon=_load_lexicon(args.lexicon),
+            max_generation_rtf=args.max_generation_rtf,
+        )
+    except (KeyError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "engine": plan.engine.key,
+                "text": {
+                    "normalized": plan.text.normalized,
+                    "segments": list(plan.text.segments),
+                    "script_hints": list(plan.text.script_hints),
+                    "pronunciation_overrides": [
+                        asdict(item) for item in plan.text.pronunciation_overrides
+                    ],
+                },
+                "controls": asdict(plan.controls),
+                "requested_controls": plan.requested_controls,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0
 
 
@@ -213,12 +319,41 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_parser.add_argument("--engine-arg", action="append", default=[])
     benchmark_parser.set_defaults(func=_cmd_benchmark)
 
-    route_parser = sub.add_parser("route", help="Select qualified engines by capability.")
+    route_parser = sub.add_parser("route", help="Select qualified engines by capability/performance.")
     route_parser.add_argument("--language")
     route_parser.add_argument("--require", action="append", default=[])
     route_parser.add_argument("--prefer", action="append", default=[])
+    route_parser.add_argument("--max-generation-rtf", type=float)
     route_parser.add_argument("--allow-restricted-commercial-use", action="store_true")
     route_parser.set_defaults(func=_cmd_route)
+
+    text_parser = sub.add_parser("text", help="Run OurTTS text/pronunciation/control preprocessing.")
+    text_parser.add_argument("--text", required=True)
+    text_parser.add_argument("--language")
+    text_parser.add_argument("--lexicon", type=Path)
+    text_parser.set_defaults(func=_cmd_text)
+
+    lexicon_parser = sub.add_parser("lexicon-check", help="Validate a pronunciation lexicon.")
+    lexicon_parser.add_argument("path", type=Path)
+    lexicon_parser.set_defaults(func=_cmd_lexicon_check)
+
+    prosody_parser = sub.add_parser("prosody-check", help="Validate a Prosody Timeline JSON file.")
+    prosody_parser.add_argument("path", type=Path)
+    prosody_parser.set_defaults(func=_cmd_prosody_check)
+
+    voicepack_parser = sub.add_parser("voicepack-check", help="Validate a VoicePack directory.")
+    voicepack_parser.add_argument("root", type=Path)
+    voicepack_parser.add_argument("--skip-hashes", action="store_true")
+    voicepack_parser.set_defaults(func=_cmd_voicepack_check)
+
+    plan_parser = sub.add_parser("plan", help="Build an engine-aware OurTTS synthesis plan.")
+    plan_parser.add_argument("--text", required=True)
+    plan_parser.add_argument("--language")
+    plan_parser.add_argument("--engine")
+    plan_parser.add_argument("--lexicon", type=Path)
+    plan_parser.add_argument("--control", action="append", default=[])
+    plan_parser.add_argument("--max-generation-rtf", type=float)
+    plan_parser.set_defaults(func=_cmd_plan)
     return parser
 
 
