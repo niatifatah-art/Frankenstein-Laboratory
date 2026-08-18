@@ -1,0 +1,98 @@
+name: ourtts-v04-render-e2e
+
+on:
+  pull_request:
+    paths:
+      - "src/ttslab/**"
+      - "engines/kokoro/**"
+      - "tests/**"
+      - ".github/workflows/ourtts-v04-render-e2e.yml"
+  workflow_dispatch:
+
+jobs:
+  render-and-phonemes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system runtime
+        run: sudo apt-get update && sudo apt-get install -y espeak-ng
+      - name: Install Core tooling
+        run: python -m pip install --upgrade uv && python -m pip install -e ".[dev]"
+
+      - name: Run exact-pause synthesis through OurTTS
+        run: |
+          mkdir -p outputs
+          python -m ttslab synthesize \
+            --engine pocket_tts \
+            --language en \
+            --text "The first segment is speaking. [[pause:320ms]] The second segment starts after exact silence." \
+            --output outputs/ourtts-exact-pause.wav
+
+      - name: Verify exact PCM pause boundary
+        run: |
+          python - <<'PY'
+          import json
+          import wave
+          from pathlib import Path
+
+          wav_path = Path("outputs/ourtts-exact-pause.wav")
+          manifest = json.loads(Path(str(wav_path) + ".manifest.json").read_text())
+          assert manifest["engine"] == "pocket_tts"
+          assert len(manifest["segments"]) == 2
+          assert manifest["segments"][0]["pause_after_ms"] == 320
+
+          first_frames = manifest["segments"][0]["audio"]["frames"]
+          with wave.open(str(wav_path), "rb") as wav:
+              rate = wav.getframerate()
+              channels = wav.getnchannels()
+              width = wav.getsampwidth()
+              assert rate == 24000
+              assert channels == 1 and width == 2
+              wav.setpos(first_frames)
+              pause_frames = round(rate * 0.320)
+              silence = wav.readframes(pause_frames)
+              assert silence == b"\x00" * pause_frames * channels * width
+          print("exact_pause_frames", pause_frames)
+          PY
+
+      - name: Run real Kokoro raw-phoneme synthesis through Core isolation
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from ttslab.audio import inspect_wav
+          from ttslab.isolation import execute_worker
+
+          output = Path("outputs/kokoro-raw-phoneme.wav")
+          execution = execute_worker(
+              "kokoro",
+              phonemes="hˌW ɑɹ ju tədˈA?",
+              output=output,
+              extra_args=["--language", "a", "--voice", "af_heart"],
+              timeout_seconds=1800,
+          )
+          assert execution.returncode == 0, execution.stderr
+          assert execution.payload is not None
+          assert execution.payload["input_mode"] == "raw_phonemes"
+          assert execution.payload["observed_phonemes"]
+          info = inspect_wav(output, min_frames=2400)
+          Path("outputs/kokoro-raw-phoneme.json").write_text(
+              json.dumps({"worker": execution.payload, "audio": info.as_dict()}, indent=2)
+          )
+          print(info.sha256, info.duration_seconds)
+          PY
+
+      - name: Validate full test suite
+        run: |
+          ruff check .
+          pytest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ourtts-v04-render-e2e
+          path: outputs/
+          if-no-files-found: error
