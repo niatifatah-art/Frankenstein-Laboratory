@@ -1,12 +1,19 @@
 name: lab-e2e
 
 on:
+  pull_request:
+    paths:
+      - "src/ttslab/**"
+      - "registry/**"
+      - "examples/**"
+      - "tests/**"
+      - ".github/workflows/lab-e2e.yml"
   workflow_dispatch:
 
 jobs:
-  benchmark-contract:
+  owned-core-and-real-backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -14,30 +21,51 @@ jobs:
           python-version: "3.12"
       - run: sudo apt-get update && sudo apt-get install -y espeak-ng
       - run: python -m pip install --upgrade uv && python -m pip install -e ".[dev]"
-      - name: Registry and routing
+
+      - name: Validate owned Core formats and routing
         run: |
           python -m ttslab registry-check
-          python -m ttslab route --require cpu --prefer streaming --language en
-      - name: Benchmark through Core contract
+          python -m ttslab lexicon-check examples/pronunciation-v1.json
+          python -m ttslab prosody-check examples/prosody-v1.json
+          python -m ttslab voicepack-check examples/voicepack-v1 --skip-hashes
+          python -m ttslab text \
+            --text "DevShelf says Yessss! [[pause:320ms]] Really." \
+            --language en \
+            --lexicon examples/pronunciation-v1.json
+          python -m ttslab route \
+            --language en \
+            --prefer streaming \
+            --max-generation-rtf 2
+          python -m ttslab plan \
+            --text "Hello from the owned OurTTS core." \
+            --language en \
+            --control pause=320 \
+            --max-generation-rtf 2
+
+      - name: Benchmark a real backend through the Core contract
         run: |
+          mkdir -p outputs
           python -m ttslab benchmark pocket_tts \
             --case en_basic \
             --output-dir outputs \
             --result outputs/pocket-en-basic.json
-      - name: Verify structured result
+
+      - name: Verify structured result and audio
         run: |
           python - <<'PY'
           import json, wave
           from pathlib import Path
-          data = json.loads(Path('outputs/pocket-en-basic.json').read_text())
-          assert data['status'] == 'passed', data
-          audio = data['audio']
-          assert audio['sha256'] and audio['duration_seconds'] > 0
-          wav_path = Path(audio['path'])
-          with wave.open(str(wav_path), 'rb') as wav:
+
+          data = json.loads(Path("outputs/pocket-en-basic.json").read_text())
+          assert data["status"] == "passed", data
+          audio = data["audio"]
+          assert audio["sha256"] and audio["duration_seconds"] > 0
+          wav_path = Path(audio["path"])
+          with wave.open(str(wav_path), "rb") as wav:
               assert wav.getframerate() > 0 and wav.getnframes() > 1000
-          print(data['engine'], data['case']['key'], audio['sha256'])
+          print(data["engine"], data["case"]["key"], audio["sha256"])
           PY
+
       - uses: actions/upload-artifact@v4
         with:
           name: lab-e2e-pocket-benchmark
