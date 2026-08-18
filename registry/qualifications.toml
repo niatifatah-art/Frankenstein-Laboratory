@@ -1,0 +1,78 @@
+# Mutable qualification evidence layered over registry/engines.toml.
+# Promotion to `ready` requires a real model load, synthesis, PCM WAV validation,
+# and a retained workflow artifact. Static licensing/provenance remains in engines.toml.
+
+[qualification.chatterbox_base]
+integration_status = "ready"
+source_revision = "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+qualification_run = 32180309921
+artifact_id = 9340561759
+artifact_digest = "sha256:9125e75dffe09ff3086936b52c855ad0142bb3eda07375e233291cbd348b3415"
+hardware = ["cpu", "cuda", "mps"]
+notes = "Qualified on GitHub Ubuntu CPU with current upstream source revision and PerTh enabled. 3.68 s PCM/24 kHz audio; load 56.05 s; generation 28.56 s; generation RTF 7.76. CPU works but is not a low-latency target."
+
+[qualification.chatterbox_nano]
+integration_status = "ready"
+source_revision = "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+qualification_run = 32180309921
+artifact_id = 9340570332
+artifact_digest = "sha256:7acf03b9385cf01a5e858c0e41ffcc54bc764ce879087c56dc4a1ee300c5746b"
+hardware = ["cpu", "cuda"]
+notes = "Qualified on GitHub Ubuntu CPU using a synthetic Kokoro reference owned by the lab. 4.68 s PCM/24 kHz audio; load 34.24 s; generation 21.47 s; generation RTF 4.59. PerTh remained enabled."
+
+[qualification.chatterbox_turbo]
+integration_status = "ready"
+source_revision = "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+qualification_run = 32180309921
+artifact_id = 9340585121
+artifact_digest = "sha256:b63838e99380573071918ad84f73a010b963e4dd1a2369458d6550fa992f0cff"
+hardware = ["cpu", "cuda"]
+notes = "Qualified on GitHub Ubuntu CPU using a synthetic Kokoro reference owned by the lab. 5.24 s PCM/24 kHz audio; load 47.18 s; generation 20.82 s; generation RTF 3.97. CPU functional but GPU remains the natural low-latency target."
+
+[qualification.chatterbox_v3]
+integration_status = "ready"
+source_revision = "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+qualification_run = 32180309921
+artifact_id = 9340596380
+artifact_digest = "sha256:cd5d7e56a8c5b0813fe1d0dbadcdbf299e5633a15854ebe84c236d9f660bbe03"
+hardware = ["cpu", "cuda", "mps"]
+notes = "Qualified on GitHub Ubuntu CPU using a synthetic Kokoro reference owned by the lab. 5.52 s PCM/24 kHz audio; load 39.10 s; generation 66.43 s; generation RTF 12.03. CPU works but is very slow for this multilingual checkpoint."
+
+[qualification.qwen3_custom_06b]
+integration_status = "ready"
+qualification_run = 32180309921
+artifact_id = 9340629250
+artifact_digest = "sha256:24e74dca477121e743235ad77cfb67e16d4cddb85e9cbc56c0e65471c283c128"
+hardware = ["cpu", "cuda_recommended"]
+notes = "Qualified on GitHub Ubuntu CPU with direct CPU-only PyTorch resolution. 6.00 s PCM/24 kHz audio; load 13.79 s; generation 161.54 s; generation RTF 26.92. Functionally CPU-capable but far too slow for CPU realtime routing."
+
+[qualification.qwen3_base_06b]
+integration_status = "ready"
+qualification_run = 32180309921
+artifact_id = 9340626087
+artifact_digest = "sha256:38215edf31961a9842a76f3779cff6ee52eb0b6a05754186b19a12ab422df5b5"
+hardware = ["cpu", "cuda_recommended"]
+notes = "Qualified voice cloning on GitHub Ubuntu CPU using a synthetic Kokoro reference owned by the lab. 3.76 s PCM/24 kHz audio; load 13.39 s; generation 131.15 s; generation RTF 34.88. Functional on CPU but CUDA is strongly preferred."
+
+[qualification.voxcpm2]
+integration_status = "ready"
+qualification_run = 32180309921
+artifact_id = 9340560127
+artifact_digest = "sha256:3fc2e9266daede731d97a4a682fa0176620a181cfa5cc63188a6da5253ac8496"
+hardware = ["cpu", "cuda_recommended"]
+notes = "Qualified on GitHub Ubuntu CPU with CPU-only PyTorch and load_denoiser=false. Model snapshot 32279effe8c19989596f05d353d1447f51d9e915. 5.28 s PCM/48 kHz audio; load 48.86 s; generation 28.58 s; generation RTF 5.41."
+
+[qualification.cosyvoice3]
+integration_status = "install_verified"
+source_revision = "074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc"
+notes = "Source + recursive submodule contract compiled on GitHub. Matcha submodule revision dd9105b380c23b8e1875cd7c1db7e25037f65913. Full ~10 GB checkpoint inference is not claimed by this source qualification."
+
+[qualification.openvoice_v2]
+integration_status = "component"
+source_revision = "74a1d147b17a8c3092dd5430504bd83ef6c7eb23"
+notes = "OpenVoice V2 source compiled and ToneColorConverter contract verified. Tracked as a voice-conversion component, not a standalone text-to-waveform backend. Real converter qualification remains separate."
+
+[qualification.vibevoice_realtime]
+integration_status = "researching"
+source_revision = "94da20d98b2fa7688e9cbfaf7692ddb4954f7600"
+notes = "Current source compiled and realtime model contract was found. Kept in research zone because current model-card intended-use restrictions are stricter than repository license metadata alone."
