@@ -17,6 +17,8 @@ class EngineCapabilities:
     phoneme_input: bool | None = None
     long_form: bool | None = None
     dialogue: bool | None = None
+    style_control: bool | None = None
+    voice_conversion: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
