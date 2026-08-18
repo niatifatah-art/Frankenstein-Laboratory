@@ -1,0 +1,47 @@
+{
+  "kind": "real_model_smoke",
+  "engine": "kokoro",
+  "engine_package_version": "0.9.4",
+  "date": "2026-08-18",
+  "source_commit": "da00c459375e735f50f266adb742be45a3ef8d5f",
+  "github_actions_run_id": 32175695335,
+  "github_actions_job_id": 95836990717,
+  "artifact_id": 9339007650,
+  "artifact_name": "kokoro-smoke-audio",
+  "environment": {
+    "os": "Ubuntu 24.04.4 LTS",
+    "runner_image": "ubuntu-24.04",
+    "runner_image_version": "20260810.271.1",
+    "python": "3.12.13",
+    "uv": "0.12.5",
+    "device_class": "GitHub-hosted CPU runner"
+  },
+  "input": {
+    "text": "Hello from Frankenstein Laboratory. This is the first real Kokoro smoke test.",
+    "voice": "af_heart",
+    "language": "a",
+    "speed": 1.0
+  },
+  "output": {
+    "sample_rate_hz": 24000,
+    "audio_duration_seconds": 5.625,
+    "wav_bytes": 270044,
+    "segments": 1
+  },
+  "timing": {
+    "model_ready_seconds": 5.93119564700001,
+    "time_to_first_audio_seconds": 8.756683482,
+    "total_generation_seconds": 8.765941060000017,
+    "real_time_factor": 1.5583895217777808
+  },
+  "validation": {
+    "synthesis_exit": "success",
+    "wav_header": "success",
+    "artifact_upload": "success"
+  },
+  "observations": [
+    "This is a cold smoke run, not a quality benchmark.",
+    "Dependency resolution pulled large NVIDIA/CUDA packages on a CPU runner; a CPU-only PyTorch source is being tested next.",
+    "The timing includes model initialization and first-run setup; do not compare it directly with warmed inference."
+  ]
+}
