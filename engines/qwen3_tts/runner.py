@@ -111,8 +111,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         return synthesize(args)
-    except Exception as exc:
-        print(json.dumps({"error": type(exc).__name__, "message": str(exc)}, ensure_ascii=False), file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001
+        print(
+            json.dumps({"error": type(exc).__name__, "message": str(exc)}, ensure_ascii=False),
+            file=sys.stderr,
+        )
         return 5
 
 
