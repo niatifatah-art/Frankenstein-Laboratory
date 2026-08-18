@@ -11,7 +11,7 @@ from .text_engine import PreparedText, prepare_text
 _CONTROL_CAPABILITY = {
     "style": "style_control",
     "emotion": "emotion_control",
-    "phoneme": "phoneme_input",
+    "phoneme": "phoneme_override",
     "voice_design": "voice_design",
     "nonverbal": "paralinguistic_tags",
 }
@@ -82,7 +82,7 @@ def build_synthesis_plan(
 
     prepared = prepare_text(text, language=language, lexicon=lexicon)
     if any(item.mode == "phoneme" for item in prepared.pronunciation_overrides):
-        if engine.supports("phoneme_input"):
+        if engine.supports("phoneme_override"):
             native.append("pronunciation_phoneme_overrides")
         else:
             unsupported.append("pronunciation_phoneme_overrides")
