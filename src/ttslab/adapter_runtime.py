@@ -64,10 +64,26 @@ _NORMALIZED_CONTROL_SUPPORT: dict[str, frozenset[str]] = {
     "qwen3_voice_design_17b": frozenset({"voice_design"}),
 }
 
+_REFERENCE_SUPPORT = frozenset(
+    {
+        "chatterbox_base",
+        "chatterbox_nano",
+        "chatterbox_turbo",
+        "chatterbox_v3",
+        "qwen3_base_06b",
+        "voxcpm2",
+    }
+)
+
 
 def adapter_supported_controls(engine_key: str) -> frozenset[str]:
     """Return normalized controls that this adapter actually translates today."""
     return _NORMALIZED_CONTROL_SUPPORT.get(engine_key, frozenset())
+
+
+def adapter_supports_reference(engine_key: str) -> bool:
+    """Return whether the current worker adapter actually consumes a reference-audio path."""
+    return engine_key in _REFERENCE_SUPPORT
 
 
 def adapter_args(engine_key: str, inputs: RuntimeInputs) -> list[str]:
@@ -80,6 +96,11 @@ def adapter_args(engine_key: str, inputs: RuntimeInputs) -> list[str]:
     args: list[str] = []
     language = inputs.language.casefold() if inputs.language else None
     controls = inputs.controls or {}
+
+    if inputs.reference is not None and not adapter_supports_reference(engine_key):
+        raise ValueError(
+            f"Adapter {engine_key!r} does not consume reference audio; refusing to ignore it."
+        )
 
     if engine_key == "pocket_tts":
         _reject_unknown_controls(engine_key, controls, set())
