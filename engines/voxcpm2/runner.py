@@ -11,15 +11,22 @@ def describe() -> dict[str, object]:
     return {
         "schema_version": 1,
         "engine": "voxcpm2",
-        "adapter_version": "0.2.0",
+        "adapter_version": "0.4.0",
         "capabilities": {
             "multilingual": True,
             "streaming": True,
             "voice_cloning": True,
             "voice_design": True,
+            "style_control": True,
             "sample_rate": 48000,
         },
     }
+
+
+def _designed_text(text: str, instruction: str | None) -> str:
+    if not instruction:
+        return text
+    return f"({instruction.strip()}){text}"
 
 
 def synthesize(args: argparse.Namespace) -> int:
@@ -38,17 +45,22 @@ def synthesize(args: argparse.Namespace) -> int:
     )
     load_seconds = time.perf_counter() - load_started
     generation_started = time.perf_counter()
-    kwargs = {
-        "text": args.text,
+    kwargs: dict[str, object] = {
+        "text": _designed_text(args.text, args.voice_design),
         "cfg_value": args.cfg,
         "inference_timesteps": args.steps,
         "max_len": args.max_len,
         "normalize": True,
         "denoise": False,
         "retry_badcase": False,
+        "seed": args.seed,
     }
     if args.reference:
-        kwargs["reference_wav_path"] = str(args.reference.resolve())
+        reference = str(args.reference.resolve())
+        kwargs["reference_wav_path"] = reference
+        if args.reference_text:
+            kwargs["prompt_wav_path"] = reference
+            kwargs["prompt_text"] = args.reference_text
     wav = model.generate(**kwargs)
     generation_seconds = time.perf_counter() - generation_started
     sample_rate = int(model.tts_model.sample_rate)
@@ -68,6 +80,10 @@ def synthesize(args: argparse.Namespace) -> int:
                 "generation_real_time_factor": generation_seconds / duration if duration else None,
                 "device": args.device,
                 "steps": args.steps,
+                "seed": args.seed,
+                "voice_design": args.voice_design,
+                "reference": str(args.reference) if args.reference else None,
+                "ultimate_clone": bool(args.reference and args.reference_text),
                 "denoiser_loaded": False,
             },
             ensure_ascii=False,
@@ -85,7 +101,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--steps", type=int, default=2)
     parser.add_argument("--cfg", type=float, default=2.0)
     parser.add_argument("--max-len", type=int, default=120)
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--reference", type=Path)
+    parser.add_argument("--reference-text", default="")
+    parser.add_argument("--voice-design", default="")
     return parser
 
 

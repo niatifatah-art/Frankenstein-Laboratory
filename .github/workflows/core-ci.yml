@@ -23,7 +23,10 @@ jobs:
         run: ruff check .
       - name: Tests
         run: pytest
-      - name: CLI smoke
+      - name: Research and product CLI smoke
         run: |
           python -m ttslab list
           python -m ttslab doctor
+          ourtts profiles
+          ourtts engines
+          ourtts doctor

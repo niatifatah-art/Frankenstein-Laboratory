@@ -101,9 +101,10 @@ qualification_run = 32180309921
 artifact_id = 9340560127
 artifact_digest = "sha256:3fc2e9266daede731d97a4a682fa0176620a181cfa5cc63188a6da5253ac8496"
 hardware = ["cpu", "cuda_recommended"]
+capabilities = ["multilingual", "streaming", "voice_cloning", "voice_design", "style_control"]
 cpu_generation_rtf = 5.412868793181814
 cpu_cold_start_seconds = 77.495856218
-notes = "Qualified on GitHub Ubuntu CPU with CPU-only PyTorch and load_denoiser=false. Model snapshot 32279effe8c19989596f05d353d1447f51d9e915. 5.28 s PCM/48 kHz audio; load 48.86 s; generation 28.58 s; generation RTF 5.41."
+notes = "Qualified on GitHub Ubuntu CPU with CPU-only PyTorch and load_denoiser=false. Model snapshot 32279effe8c19989596f05d353d1447f51d9e915. 5.28 s PCM/48 kHz audio; load 48.86 s; generation 28.58 s; generation RTF 5.41. v0.4 exposes upstream Voice Design and controllable/ultimate cloning through the worker; targeted product smoke is required for the new path."
 
 [qualification.melotts]
 integration_status = "ready"
@@ -117,9 +118,13 @@ cpu_cold_start_seconds = 10.98
 notes = "Qualified English synthesis on GitHub Ubuntu CPU after isolating legacy compatibility: setuptools<81, NLTK 3.8.1, CPU PyTorch, and UniDic path redirected to bundled unidic-lite. 4.659 s PCM/44.1 kHz audio; load 5.18 s; generation 5.80 s; generation RTF 1.245."
 
 [qualification.cosyvoice3]
-integration_status = "install_verified"
+integration_status = "qualified_external"
 source_revision = "074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc"
-notes = "Source + recursive submodule contract compiled on GitHub. Matcha submodule revision dd9105b380c23b8e1875cd7c1db7e25037f65913. Full ~10 GB checkpoint inference is not claimed by this source qualification."
+qualification_run = 32189153493
+artifact_id = 9343947902
+artifact_digest = "sha256:549c9dc0f7b956e67daa949b58d426ffdd8e91aa18b25fb3ffbcf50c446060c3"
+hardware = ["cpu", "cuda_recommended"]
+notes = "Real Fun-CosyVoice3-0.5B-2512 zero-shot inference passed on GitHub Ubuntu CPU for five controlled synthetic references after the corrected Whisper-compatible source install. The retained artifact contains generated outputs. It remains non-routable until a stable isolated worker contract is added; this status reconciles real evidence without pretending product readiness."
 
 [qualification.openvoice_v2]
 integration_status = "qualified_component"

@@ -11,6 +11,7 @@ _ALLOWED_STATUSES = {
     "install_verified",
     "component",
     "qualified_component",
+    "qualified_external",
     "researching",
     "planned",
     "blocked",
@@ -57,14 +58,19 @@ class EngineRecord:
     def qualified_component(self) -> bool:
         return self.integration_status == "qualified_component"
 
+    @property
+    def evidence_qualified(self) -> bool:
+        return self.integration_status in {"ready", "qualified_component", "qualified_external"}
+
     def supports(self, capability: str) -> bool:
         return capability in self.capabilities
 
     def supports_language(self, language: str | None) -> bool:
         if language is None:
             return True
-        requested = language.casefold()
-        return "*" in self.languages or requested in {item.casefold() for item in self.languages}
+        requested = language.casefold().replace("_", "-")
+        available = {item.casefold().replace("_", "-") for item in self.languages}
+        return "*" in available or requested in available or requested.split("-", 1)[0] in available
 
 
 def repository_root(start: Path | None = None) -> Path:
@@ -192,6 +198,8 @@ def validate_registry(path: Path | None = None) -> tuple[str, ...]:
             errors.append(f"{record.key}: ready engine has unverified license status")
         if record.integration_status == "qualified_component" and record.kind == "tts":
             errors.append(f"{record.key}: qualified_component should not be kind='tts'")
+        if record.integration_status == "qualified_external" and record.qualification_run is None:
+            errors.append(f"{record.key}: qualified_external requires retained qualification evidence")
         if record.artifact_digest and not record.artifact_digest.startswith("sha256:"):
             errors.append(f"{record.key}: artifact_digest must use sha256: prefix")
         for metric_name, value in (

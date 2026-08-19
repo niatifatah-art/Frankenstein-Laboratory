@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "frankenstein-tts-lab"
-version = "0.3.0"
-description = "A reproducible laboratory for evaluating and integrating open-source TTS systems."
+version = "0.4.0"
+description = "A reproducible TTS laboratory and the modular OurTTS product core."
 requires-python = ">=3.11"
 dependencies = []
 
@@ -17,6 +17,7 @@ dev = [
 
 [project.scripts]
 ttslab = "ttslab.cli:main"
+ourtts = "ttslab.user_cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

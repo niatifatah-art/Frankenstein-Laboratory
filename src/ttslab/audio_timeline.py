@@ -25,13 +25,20 @@ def silence_frames(milliseconds: int, sample_rate: int) -> int:
     return round(sample_rate * milliseconds / 1000)
 
 
-def concatenate_pcm_wavs(parts: tuple[AudioPart, ...] | list[AudioPart], output: Path) -> WavInfo:
+def concatenate_pcm_wavs(
+    parts: tuple[AudioPart, ...] | list[AudioPart],
+    output: Path,
+    *,
+    leading_silence_ms: int = 0,
+) -> WavInfo:
     """Concatenate compatible PCM WAVs and insert exact zero-valued silence.
 
     Hidden resampling is deliberately refused so timing and benchmark provenance remain explicit.
     """
     if not parts:
         raise ValueError("At least one audio part is required.")
+    if leading_silence_ms < 0:
+        raise ValueError("leading_silence_ms must be non-negative.")
 
     payloads: list[tuple[bytes, int]] = []
     params: tuple[int, int, int] | None = None
@@ -54,6 +61,8 @@ def concatenate_pcm_wavs(parts: tuple[AudioPart, ...] | list[AudioPart], output:
         out.setnchannels(channels)
         out.setsampwidth(sample_width)
         out.setframerate(sample_rate)
+        if leading_silence_ms:
+            out.writeframes(zero_frame * silence_frames(leading_silence_ms, sample_rate))
         for payload, silence_ms in payloads:
             out.writeframes(payload)
             if silence_ms:
