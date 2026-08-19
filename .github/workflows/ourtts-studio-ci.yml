@@ -1,0 +1,44 @@
+name: ourtts-studio-ci
+
+on:
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "src/ttslab/studio_server.py"
+      - "src/ttslab/studio/**"
+      - "tests/test_studio_v05.py"
+      - ".github/workflows/ourtts-studio-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  studio:
+    name: local Studio contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Studio and test dependencies
+        run: |
+          python -m pip install -e ".[dev,studio]"
+          python -m pip install httpx2
+      - name: Ruff
+        run: ruff check .
+      - name: Studio tests
+        run: pytest -q tests/test_studio_v05.py
+      - name: Full lightweight regression suite
+        run: pytest -q tests
+      - name: CLI and app import smoke
+        run: |
+          ourtts --help >/dev/null
+          ourtts-studio --help >/dev/null
+          python - <<'PY'
+          from ttslab.studio_server import create_app
+          app = create_app()
+          assert app.title == "ourTTS Studio"
+          PY

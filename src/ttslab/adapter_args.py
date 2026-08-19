@@ -65,12 +65,17 @@ def _add_path(args: list[str], flag: str, value: Path | None) -> None:
         args.extend([flag, str(value.resolve())])
 
 
+def _looks_like_chatterbox_state(path: Path) -> bool:
+    return path.name.endswith(".conds.pt")
+
+
 def compile_adapter_args(
     engine: EngineRecord,
     *,
     language: str | None = None,
     voice: str | None = None,
     reference: Path | None = None,
+    voice_state: Path | None = None,
     reference_text: str | None = None,
     voice_design: str | None = None,
     style: str | None = None,
@@ -79,12 +84,18 @@ def compile_adapter_args(
 ) -> AdapterArguments:
     """Translate stable OurTTS concepts into one worker's explicit CLI contract.
 
-    Unsupported concepts are returned rather than silently discarded.
+    Unsupported concepts are returned rather than silently discarded. Prepared backend voice
+    state is deliberately separate from raw reference audio so binary state is never passed to an
+    adapter as if it were a WAV. The legacy synthesis path may still supply a VoicePack backend
+    state through ``reference``; verified Chatterbox state filenames are recognized explicitly.
     """
     key = engine.key
     args: list[str] = []
     unsupported: list[str] = []
     effective_language: str | None = None
+
+    if reference is not None and voice_state is not None:
+        raise ValueError("reference audio and prepared voice state are mutually exclusive")
 
     if language:
         if key == "kokoro":
@@ -125,19 +136,30 @@ def compile_adapter_args(
             effective_language = language
 
     if voice:
-        if key == "kokoro" or (key == "pocket_tts" and reference is None):
+        if key == "kokoro" or (key == "pocket_tts" and reference is None and voice_state is None):
             args += ["--voice", voice]
         elif key == "qwen3_custom_06b":
             args += ["--speaker", voice]
         else:
             unsupported.append("voice")
 
+    if voice_state is not None:
+        if key.startswith("chatterbox_"):
+            _add_path(args, "--voice-state", voice_state)
+        elif key == "pocket_tts":
+            args += ["--voice", str(voice_state.resolve())]
+        else:
+            unsupported.append("voice_state")
+
     if reference is not None:
         if key == "pocket_tts":
             if voice:
                 unsupported.append("voice_with_reference")
             args += ["--voice", str(reference.resolve())]
-        elif key.startswith("chatterbox_") or key in {"qwen3_base_06b", "voxcpm2"}:
+        elif key.startswith("chatterbox_"):
+            flag = "--voice-state" if _looks_like_chatterbox_state(reference) else "--reference"
+            _add_path(args, flag, reference)
+        elif key in {"qwen3_base_06b", "voxcpm2"}:
             _add_path(args, "--reference", reference)
         else:
             unsupported.append("reference")

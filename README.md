@@ -1,12 +1,12 @@
-# Frankenstein Laboratory
+# Frankenstein Laboratory → ourTTS
 
-A reproducible laboratory for **running, benchmarking, dissecting and integrating open-source TTS**
-while progressively building **OurTTS**, a stable product-facing speech engine that does not belong
-to any single upstream model.
+**Frankenstein Laboratory** is the reproducible R&D environment for running, qualifying, benchmarking and dissecting open-source TTS systems.
 
-The lab can contain many models. The user should not have to manage them.
+**ourTTS** is the product boundary built on top of that evidence. The lab may contain many models; a normal user should not have to understand or manage them.
 
-## The simple path — OurTTS v0.4
+## Start simple
+
+Core/CLI:
 
 ```bash
 python -m pip install -e ".[dev]"
@@ -14,55 +14,58 @@ python -m pip install -e ".[dev]"
 ourtts speak \
   --text "Yessss! [[pause:320ms]] It actually works." \
   --language en \
-  --profile fast_cpu \
-  --lexicon examples/pronunciation-v1.json \
+  --profile auto \
   --output out.wav
 ```
 
-`ourtts` now provides the product boundary:
-
-- human-friendly routing profiles (`auto`, `fast_cpu`, `balanced_cpu`, `quality`, `voice_clone`,
-  `voice_design`, `multilingual`);
-- lightweight device-aware routing plus measured CPU evidence;
-- explicit commercial/license gating;
-- persistent pronunciation lexicons;
-- a verified Kokoro phoneme compiler so stored phoneme fixes actually reach synthesis;
-- exact PCM digital pauses with no hidden resampling;
-- VoicePack reference provenance and consent checks;
-- natural-language Voice Design where the selected backend supports it;
-- stable engine argument translation instead of leaking model-specific flags into ACE/Studio;
-- content-addressed caching;
-- JSON batch manifests for many voices/languages;
-- a stable Python facade for ACE and future Studio integration.
-
-Python:
-
-```python
-from pathlib import Path
-from ttslab.api import OurTTS
-from ttslab.synthesis import SynthesisRequest
-
-client = OurTTS()
-result = client.speak(
-    SynthesisRequest(
-        text="Hello from OurTTS.",
-        output=Path("hello.wav"),
-        language="en",
-        profile="fast_cpu",
-    )
-)
-print(result.engine, result.output_path)
-```
-
-Batch:
+Local Studio:
 
 ```bash
-ourtts batch examples/batch-v1.json --output-root outputs/batch
+python -m pip install -e ".[studio]"
+ourtts-studio
 ```
 
-### Pocket TTS reusable voice states
+Then open `http://127.0.0.1:7860`.
 
-The serialization/reuse path is verified with an ungated Pocket catalog identity:
+The Studio deliberately starts with a small surface: **text, voice, language, mode, feel, Generate**. Speed and engine override stay behind “More controls”. The backend still uses the same safe ourTTS synthesis path as the CLI; the browser does not get a second fake synthesis implementation.
+
+## What ourTTS already does
+
+- one stable `ourtts speak` product path plus the Python `OurTTS` facade;
+- human-friendly profiles: `auto`, `fast_cpu`, `balanced_cpu`, `quality`, `voice_clone`, `voice_design`, `multilingual`;
+- measured device/performance-aware routing instead of choosing engines alphabetically;
+- commercial/license gating and isolated engine environments;
+- exact leading/internal/trailing PCM digital pauses;
+- persistent pronunciation lexicons and verified Kokoro phoneme compilation;
+- VoicePack identity with reference provenance and explicit consent status;
+- reusable backend-specific voice state where an upstream system exposes a real serializable representation;
+- Voice Design and style controls only where a qualified adapter actually supports them;
+- content-addressed generation cache;
+- JSON batch generation;
+- a lightweight local Studio with light/dark responsive UI and playback;
+- retained real-model evidence in GitHub Actions rather than “it imported, therefore it works”.
+
+## VoicePacks and reusable identity
+
+Voice cloning references are never assumed safe merely because a model is open source. By default a reference must be marked:
+
+```text
+owned | licensed | consented | synthetic
+```
+
+Unknown rights are rejected unless the caller explicitly opts into that risk.
+
+A VoicePack keeps identity separate from the model that happens to synthesize it. It can hold references, languages, pronunciation links, styles and backend-specific prepared states.
+
+Inspect one:
+
+```bash
+ourtts voice-inspect --voicepack voices/my_voice
+```
+
+### Pocket TTS state
+
+Pocket catalog state reuse remains supported:
 
 ```bash
 ourtts voice-state \
@@ -72,42 +75,90 @@ ourtts voice-state \
   --catalog-voice alba
 ```
 
-That writes a reusable `states/pocket_tts.safetensors` entry into the VoicePack with SHA-256 and
-source provenance. The state can be loaded by the isolated Pocket worker without re-resolving the
-catalog identity.
+Reference-audio Pocket export uses the upstream cloning-capable weights and therefore still requires the applicable Hugging Face access/terms. ourTTS reports that gate rather than pretending the export worked.
 
-Reference-audio state export is also implemented, but Pocket's cloning-capable weights are gated by
-upstream Hugging Face terms. The user must accept those terms and authenticate the worker environment
-(for CI, with an authorized token). Without that access, OurTTS returns an explicit actionable error
-instead of pretending cloning succeeded.
+### Chatterbox prepared state — v0.5
 
-## Voice cloning safety
-
-A cloning reference is not treated as safe merely because a model is open source. By default an
-explicit reference must declare one of:
-
-```text
-owned | licensed | consented | synthetic
-```
-
-Example:
+Qualified Chatterbox Base/Nano/Turbo/V3 can prepare upstream-native `Conditionals` once and save them inside the VoicePack:
 
 ```bash
-ourtts speak \
-  --profile voice_clone \
-  --reference my-reference.wav \
-  --reference-consent owned \
-  --text "This is a consented cloning test." \
-  --output clone.wav
+ourtts voice-state \
+  --voicepack voices/my_voice \
+  --engine chatterbox_nano \
+  --device cpu
 ```
 
-Unknown rights are rejected unless the caller explicitly opts into that risk. VoicePack references
-carry their own consent/license/source metadata. A backend may additionally require its own account,
-accepted terms, or model access; those access requirements never override the provenance gate.
+The saved state is **not** described as a universal ourTTS speaker embedding. It remains tied to the backend, source reference SHA-256, adapter version, state format and qualified upstream model revision. A later synthesis may reuse it instead of preprocessing the raw reference again.
+
+The dedicated v0.5 E2E exercises this path with a controlled synthetic reference:
+
+```text
+Kokoro synthetic reference
+        ↓
+VoicePack with provenance
+        ↓
+Chatterbox Nano prepare_conditionals()
+        ↓
+serialized backend state
+        ↓
+state reload
+        ↓
+unified ourtts speak
+        ↓
+validated PCM WAV
+```
+
+## Local Studio — v0.5
+
+`ourtts-studio` is intentionally local-first. By default:
+
+```text
+outputs: ~/.cache/ourtts/studio
+voices:  ~/.local/share/ourtts/voices
+```
+
+Browser voice selection is limited to that managed VoicePack library; it does not accept arbitrary filesystem paths. The Studio exposes:
+
+- text composer;
+- managed VoicePack selection;
+- language;
+- profile/mode;
+- Natural / Energetic / Calm feel shortcuts;
+- speed and expert engine override under progressive disclosure;
+- Generate / Regenerate;
+- audio playback;
+- a collapsed “What did ourTTS do?” section with routing/result evidence.
+
+If a selected backend cannot execute a requested style/control, generation fails clearly instead of silently discarding the request.
+
+This v0.5 slice does **not** claim hosted cloud inference, accounts or billing. Those belong after the local product contract is stable.
+
+## Python
+
+```python
+from pathlib import Path
+from ttslab.api import OurTTS
+from ttslab.synthesis import SynthesisRequest
+
+client = OurTTS()
+result = client.speak(
+    SynthesisRequest(
+        text="Hello from ourTTS.",
+        output=Path("hello.wav"),
+        language="en",
+        profile="fast_cpu",
+    )
+)
+print(result.engine, result.output_path)
+```
+
+## Batch
+
+```bash
+ourtts batch examples/batch-v1.json --output-root outputs/batch
+```
 
 ## Voice Design
-
-The same product request can ask for a described voice and let routing select a qualified backend:
 
 ```bash
 ourtts speak \
@@ -117,55 +168,27 @@ ourtts speak \
   --output designed.wav
 ```
 
-VoxCPM2's v0.4 worker exposes its documented natural-language Voice Design and reference-transcript
-cloning path. Qwen3-TTS VoiceDesign remains another qualified option; device/performance evidence
-helps the router avoid absurd CPU choices where possible.
+VoxCPM2 exposes a qualified natural-language Voice Design path. Qwen3-TTS VoiceDesign is another qualified option; routing uses capability/device evidence instead of assuming a large CPU model is a sensible default.
 
 ## Qualified runtime evidence
 
-Real synthesis evidence retained by the laboratory currently includes:
+Retained real synthesis evidence currently includes:
 
-- **Kokoro 0.9.4**
-- **Pocket TTS 2.1.0** — real streaming qualification
-- **Chatterbox Base / Nano / Turbo / Multilingual V3**
-- **Qwen3-TTS 0.6B CustomVoice / Base**
-- **Qwen3-TTS 1.7B VoiceDesign**
-- **VoxCPM2**
-- **MeloTTS**
+- Kokoro 0.9.4;
+- Pocket TTS 2.1.0;
+- Chatterbox Base / Nano / Turbo / Multilingual V3;
+- Qwen3-TTS 0.6B CustomVoice / Base;
+- Qwen3-TTS 1.7B VoiceDesign;
+- VoxCPM2;
+- MeloTTS.
 
-**OpenVoice V2** is separately qualified as a real voice-conversion component rather than mislabeled
-as standalone TTS.
+OpenVoice V2 is qualified as a voice-conversion component, not mislabeled standalone TTS. CosyVoice3 has retained real zero-shot inference evidence but remains `qualified_external` until it has the same stable isolated product-worker contract as `ready` engines. Restricted/research candidates stay outside normal product routing.
 
-**CosyVoice3** has retained real five-reference zero-shot inference evidence from the corrected
-workflow. It is recorded as `qualified_external`: real inference is proven, but it is deliberately
-not product-routable until it has the same stable isolated worker contract as `ready` engines.
-
-**VibeVoice Realtime** and other license/research candidates remain in the research zone unless their
-current terms and runtime evidence meet the product gate.
-
-`ready` means real model load + real generated PCM WAV + validation + retained evidence. It does not
-mean the backend is fast on every device. The retained GitHub CPU measurements make this especially
-clear: Pocket is near/above realtime in our CPU measurement while several large Qwen/Chatterbox
-variants are functionally CPU-capable but much slower.
-
-## v0.4 verification
-
-The final v0.4 code candidate passed:
-
-- Core CI on Python 3.11, 3.12 and 3.13, including Ruff, full pytest, research CLI and product CLI;
-- real `ourtts speak` E2E with the stored `Yessss -> jɛːs` pronunciation override;
-- exact 320 ms digital-pause validation in the final PCM output;
-- the retained Pocket streaming benchmark contract;
-- real VoxCPM2 natural-language Voice Design with a retained WAV artifact;
-- real Pocket catalog VoicePack state export, SHA/provenance persistence, state reload and speech;
-- unit coverage for cloning-rights gating, batch isolation and content-addressed cache behavior.
-
-Historical multi-engine listening casts are now manual-only. Normal PRs run targeted evidence instead
-of repeatedly downloading every heavyweight model.
+`ready` means real model load + real generated PCM WAV + validation + retained evidence. It does not mean the backend is fast on every device.
 
 ## Research CLI
 
-The original laboratory CLI remains available:
+The laboratory interface remains separate:
 
 ```bash
 python -m ttslab registry-check
@@ -176,48 +199,39 @@ python -m ttslab route --language en --prefer streaming --max-generation-rtf 2
 python -m ttslab benchmark pocket_tts --case en_basic
 ```
 
-The product CLI does not replace the research CLI; it sits above it.
-
 ## Product controls and honesty
 
-Neutral OurTTS markup is parsed before model invocation:
+Neutral ourTTS markup is parsed before model invocation:
 
 ```text
 [[pause:320ms]]
 [[nonverbal:laugh]]
 ```
 
-Exact pauses are owned post-processing. Verified Chatterbox Nano/Turbo nonverbal tags can be compiled
-natively. Controls that do not yet have a verified native compiler or owned post-processor are
-reported as unsupported; they are never silently ignored. `--allow-degraded` exists for explicit
-experimentation.
+Exact pauses are owned post-processing. Native tags are compiled only for engines with verified support. An unimplemented pitch/emotion/style/pronunciation path stays unsupported rather than being faked. `--allow-degraded` exists only as an explicit experiment escape hatch.
 
 ## Core rules
 
-- code license != model weights license != dataset license != voice asset license;
-- voice consent/provenance is separate from all of the above;
-- an adapter existing is not the same as a model working;
-- a model loading is not the same as valid audio;
-- CPU-compatible is not the same as CPU-realtime;
+- code license != weights license != dataset/training provenance != voice rights;
+- voice consent/provenance is independent of the model license;
+- adapter exists != model works;
+- model loads != valid audio;
+- CPU-compatible != CPU-realtime;
+- external engines remain isolated;
 - research-only/restricted components do not silently enter product routing;
-- one engine's dependency conflict must not break the Core;
 - unsupported controls remain visible;
-- unmeasured values stay unknown;
-- expensive multi-engine casts are manual/targeted, not mandatory on every PR.
+- unmeasured values remain unknown;
+- model weights, personal references and large generated audio do not go in Git.
 
-## What remains after v0.4
+## What remains
 
-Functional qualification is not the same as complete quality evaluation. The next research layers are
-common-corpus WER/CER, speaker similarity on consented/synthetic references, hallucination/repetition
-detection, long-form and code-switching quality, GPU calibration, more language-specific semantic
-normalization/G2P, more verified prosody compilers, persistent exported backend voice states beyond
-Pocket, stable product workers for useful qualified-external components, and component-by-component
-architecture harvesting toward original OurTTS synthesis models.
+ourTTS is usable infrastructure, not a claim of TTS quality leadership yet. The next evidence layers include common-corpus WER/CER, speaker similarity for consented/synthetic voices, hallucination/repetition checks, long-form and code-switching evaluation, GPU calibration, better language-specific text/G2P, more verified prosody compilers, persistent workers/streaming, and component-by-component architecture harvesting toward original **ourTTS Atom / Nano / Mini / Core / Pro / Omni** checkpoints.
 
 See:
 
-- `MASTER_AGENT_PROMPT.md` — durable engineering mission and acceptance criteria;
+- `MASTER_AGENT_PROMPT.md` — durable engineering mission;
 - `PROJECT_INSTRUCTIONS.md` — laboratory constitution;
 - `docs/product/USER_NEEDS.md` — user-facing definition of useful;
-- `docs/architecture/ourtts-v0.4-product-path.md` — product path and boundaries;
-- `docs/product/V04_ACCEPTANCE.md` — evidence ledger for this release pass.
+- `docs/architecture/ourtts-v0.4-product-path.md` — canonical product boundary;
+- `docs/product/V04_ACCEPTANCE.md` — v0.4 evidence ledger;
+- `docs/product/V05_ACCEPTANCE.md` — v0.5 Studio/prepared-voice evidence ledger.

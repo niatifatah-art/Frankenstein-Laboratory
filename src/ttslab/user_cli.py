@@ -12,6 +12,7 @@ from .profiles import list_profiles
 from .registry import load_registry
 from .synthesis import SynthesisRequest, synthesize
 from .voice_state import export_voicepack_state
+from .voicepack import VoicePack
 
 
 def _parse_control(values: list[str]) -> dict[str, object]:
@@ -107,6 +108,8 @@ def _cmd_voice_state(args: argparse.Namespace) -> int:
             engine_key=args.engine,
             language=args.language,
             catalog_voice=args.catalog_voice,
+            device=args.device,
+            timeout_seconds=args.timeout,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"ourtts: {type(exc).__name__}: {exc}", file=sys.stderr)
@@ -115,10 +118,30 @@ def _cmd_voice_state(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_voice_inspect(args: argparse.Namespace) -> int:
+    try:
+        root = args.voicepack.resolve()
+        pack = VoicePack.load(root)
+        payload = {
+            "voice_id": pack.voice_id,
+            "display_name": pack.display_name,
+            "languages": list(pack.languages),
+            "references": len(pack.references),
+            "styles": sorted(pack.style_presets),
+            "backend_states": [asdict(state) for state in pack.backend_states],
+            "errors": list(pack.validate_files(root, verify_hashes=True)),
+        }
+    except Exception as exc:  # noqa: BLE001
+        print(f"ourtts: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ourtts",
-        description="One product-facing interface over qualified Frankenstein Laboratory TTS backends.",
+        description="One simple product interface over qualified Frankenstein Laboratory TTS backends.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -132,7 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
         func=_cmd_doctor
     )
 
-    speak = sub.add_parser("speak", help="Generate speech through the safe unified OurTTS path.")
+    speak = sub.add_parser("speak", help="Generate speech through the safe unified ourTTS path.")
     speak.add_argument("--text", required=True)
     speak.add_argument("--output", type=Path, required=True)
     speak.add_argument("--language")
@@ -184,16 +207,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     voice_state = sub.add_parser(
         "voice-state",
-        help="Build a reusable Pocket TTS backend state inside a VoicePack.",
+        help="Prepare a reusable backend-specific VoicePack state (Pocket or qualified Chatterbox).",
     )
     voice_state.add_argument("--voicepack", type=Path, required=True)
     voice_state.add_argument("--engine", default="pocket_tts")
     voice_state.add_argument("--language")
     voice_state.add_argument(
         "--catalog-voice",
-        help="Export an ungated Pocket catalog identity. Omit to use a consented VoicePack reference.",
+        help="Pocket-only catalog identity. Chatterbox uses the VoicePack reference instead.",
     )
+    voice_state.add_argument("--device", default="cpu")
+    voice_state.add_argument("--timeout", type=float, default=1800.0)
     voice_state.set_defaults(func=_cmd_voice_state)
+
+    voice_inspect = sub.add_parser("voice-inspect", help="Inspect a VoicePack and its prepared states.")
+    voice_inspect.add_argument("--voicepack", type=Path, required=True)
+    voice_inspect.set_defaults(func=_cmd_voice_inspect)
     return parser
 
 
