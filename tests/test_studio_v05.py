@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("fastapi")
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from ttslab.studio_server import create_app  # noqa: E402
-from ttslab.synthesis import SynthesisResult  # noqa: E402
+from ttslab.studio_server import create_app
+from ttslab.synthesis import SynthesisResult
 
 
 def _write_wav(path: Path) -> None:
