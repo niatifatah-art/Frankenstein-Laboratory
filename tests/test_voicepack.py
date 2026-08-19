@@ -94,3 +94,71 @@ def test_voicepack_style_preset_is_explicit() -> None:
 def test_voicepack_rejects_path_traversal() -> None:
     with pytest.raises(ValueError):
         BackendVoiceState(engine="pocket_tts", path="../escape.safetensors")
+
+
+def test_backend_state_roundtrip_resolution_and_replacement(tmp_path: Path) -> None:
+    state_path = tmp_path / "backend_states" / "chatterbox_nano.conds.pt"
+    state_path.parent.mkdir()
+    state_path.write_bytes(b"prepared-voice-state-v1")
+    digest = hashlib.sha256(state_path.read_bytes()).hexdigest()
+    state = BackendVoiceState(
+        engine="chatterbox_nano",
+        path="backend_states/chatterbox_nano.conds.pt",
+        model_revision="5de7a54aa4e5e2baadb0182dde554908b48b85c2",
+        sha256=digest,
+        format="chatterbox-conditionals-pt-v1",
+        source_reference_sha256="0" * 64,
+        adapter_version="0.2.0",
+    )
+    pack = VoicePack(voice_id="creator", display_name="Creator").with_backend_state(state)
+    pack.save_atomic(tmp_path)
+
+    loaded = VoicePack.load(tmp_path)
+    selection = loaded.resolve_backend_state(tmp_path, "chatterbox_nano")
+    assert selection is not None
+    assert selection.path == state_path.resolve()
+    assert selection.state.format == "chatterbox-conditionals-pt-v1"
+    assert loaded.validate_files(tmp_path) == ()
+
+    state_path.write_bytes(b"prepared-voice-state-v2")
+    new_digest = hashlib.sha256(state_path.read_bytes()).hexdigest()
+    replacement = BackendVoiceState(
+        engine="chatterbox_nano",
+        path=state.path,
+        sha256=new_digest,
+        format=state.format,
+    )
+    replaced = loaded.with_backend_state(replacement)
+    assert len(replaced.backend_states) == 1
+    assert replaced.backend_states[0].sha256 == new_digest
+
+
+def test_backend_state_hash_mismatch_is_refused(tmp_path: Path) -> None:
+    state_path = tmp_path / "backend_states" / "state.pt"
+    state_path.parent.mkdir()
+    state_path.write_bytes(b"state")
+    pack = VoicePack(
+        voice_id="creator",
+        display_name="Creator",
+        backend_states=(
+            BackendVoiceState(
+                engine="chatterbox_nano",
+                path="backend_states/state.pt",
+                sha256="0" * 64,
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="hash mismatch"):
+        pack.resolve_backend_state(tmp_path, "chatterbox_nano")
+
+
+def test_voicepack_rejects_duplicate_backend_engine_state() -> None:
+    with pytest.raises(ValueError, match="duplicate backend state"):
+        VoicePack(
+            voice_id="duplicate",
+            display_name="Duplicate",
+            backend_states=(
+                BackendVoiceState(engine="chatterbox_nano", path="a.pt"),
+                BackendVoiceState(engine="chatterbox_nano", path="b.pt"),
+            ),
+        )
