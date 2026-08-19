@@ -60,11 +60,26 @@ Batch:
 ourtts batch examples/batch-v1.json --output-root outputs/batch
 ```
 
-Pocket TTS voice-state export for a consented VoicePack:
+### Pocket TTS reusable voice states
+
+The serialization/reuse path is verified with an ungated Pocket catalog identity:
 
 ```bash
-ourtts voice-state --voicepack voices/my_voice --engine pocket_tts --language en
+ourtts voice-state \
+  --voicepack voices/alba_cached \
+  --engine pocket_tts \
+  --language en \
+  --catalog-voice alba
 ```
+
+That writes a reusable `states/pocket_tts.safetensors` entry into the VoicePack with SHA-256 and
+source provenance. The state can be loaded by the isolated Pocket worker without re-resolving the
+catalog identity.
+
+Reference-audio state export is also implemented, but Pocket's cloning-capable weights are gated by
+upstream Hugging Face terms. The user must accept those terms and authenticate the worker environment
+(for CI, with an authorized token). Without that access, OurTTS returns an explicit actionable error
+instead of pretending cloning succeeded.
 
 ## Voice cloning safety
 
@@ -87,7 +102,8 @@ ourtts speak \
 ```
 
 Unknown rights are rejected unless the caller explicitly opts into that risk. VoicePack references
-carry their own consent/license/source metadata.
+carry their own consent/license/source metadata. A backend may additionally require its own account,
+accepted terms, or model access; those access requirements never override the provenance gate.
 
 ## Voice Design
 
@@ -120,7 +136,7 @@ Real synthesis evidence retained by the laboratory currently includes:
 **OpenVoice V2** is separately qualified as a real voice-conversion component rather than mislabeled
 as standalone TTS.
 
-**CosyVoice3** now has retained real five-reference zero-shot inference evidence from the corrected
+**CosyVoice3** has retained real five-reference zero-shot inference evidence from the corrected
 workflow. It is recorded as `qualified_external`: real inference is proven, but it is deliberately
 not product-routable until it has the same stable isolated worker contract as `ready` engines.
 
@@ -131,6 +147,21 @@ current terms and runtime evidence meet the product gate.
 mean the backend is fast on every device. The retained GitHub CPU measurements make this especially
 clear: Pocket is near/above realtime in our CPU measurement while several large Qwen/Chatterbox
 variants are functionally CPU-capable but much slower.
+
+## v0.4 verification
+
+The final v0.4 code candidate passed:
+
+- Core CI on Python 3.11, 3.12 and 3.13, including Ruff, full pytest, research CLI and product CLI;
+- real `ourtts speak` E2E with the stored `Yessss -> jɛːs` pronunciation override;
+- exact 320 ms digital-pause validation in the final PCM output;
+- the retained Pocket streaming benchmark contract;
+- real VoxCPM2 natural-language Voice Design with a retained WAV artifact;
+- real Pocket catalog VoicePack state export, SHA/provenance persistence, state reload and speech;
+- unit coverage for cloning-rights gating, batch isolation and content-addressed cache behavior.
+
+Historical multi-engine listening casts are now manual-only. Normal PRs run targeted evidence instead
+of repeatedly downloading every heavyweight model.
 
 ## Research CLI
 
@@ -180,11 +211,13 @@ Functional qualification is not the same as complete quality evaluation. The nex
 common-corpus WER/CER, speaker similarity on consented/synthetic references, hallucination/repetition
 detection, long-form and code-switching quality, GPU calibration, more language-specific semantic
 normalization/G2P, more verified prosody compilers, persistent exported backend voice states beyond
-Pocket, and component-by-component architecture harvesting toward original OurTTS synthesis models.
+Pocket, stable product workers for useful qualified-external components, and component-by-component
+architecture harvesting toward original OurTTS synthesis models.
 
 See:
 
 - `MASTER_AGENT_PROMPT.md` — durable engineering mission and acceptance criteria;
 - `PROJECT_INSTRUCTIONS.md` — laboratory constitution;
 - `docs/product/USER_NEEDS.md` — user-facing definition of useful;
-- `docs/architecture/ourtts-v0.4-product-path.md` — product path and boundaries.
+- `docs/architecture/ourtts-v0.4-product-path.md` — product path and boundaries;
+- `docs/product/V04_ACCEPTANCE.md` — evidence ledger for this release pass.
