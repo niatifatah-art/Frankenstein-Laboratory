@@ -1,0 +1,104 @@
+name: windows-native-ci
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "engines/pocket_tts/**"
+      - "tests/**"
+      - "tests_api/**"
+      - "pyproject.toml"
+      - "install-windows.ps1"
+      - "start-ourtts-studio.cmd"
+      - "docs/platforms/windows.md"
+      - ".github/workflows/windows-native-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-core-and-real-product:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ourTTS, API and test dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip uv
+          python -m pip install -e ".[dev,api]"
+
+      - name: Core lint and tests on Windows
+        shell: pwsh
+        run: |
+          ruff check .
+          pytest -q
+          pytest -q tests_api
+
+      - name: Windows CLI and OpenAPI smoke
+        shell: pwsh
+        run: |
+          python -m ttslab doctor
+          ourtts --json
+          ourtts plan --text "Windows native planning works." --language en --quality fast --json
+          @'
+          from ttslab.product_api import create_app
+          app = create_app()
+          schema = app.openapi()
+          assert schema["info"]["title"] == "ourTTS"
+          assert "/v1/generate" in schema["paths"]
+          assert "/v1/plan" in schema["paths"]
+          print("OpenAPI: OK")
+          '@ | python -
+
+      - name: Real native Windows product generation
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path outputs | Out-Null
+          ourtts generate `
+            --text "Hello from a real native Windows ourTTS certification run." `
+            --language en `
+            --quality fast `
+            --output outputs\windows-native.wav `
+            --json | Tee-Object -FilePath outputs\windows-result.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Validate Windows PCM and routing evidence
+        shell: pwsh
+        run: |
+          @'
+          import json
+          import wave
+          from pathlib import Path
+
+          wav_path = Path("outputs/windows-native.wav")
+          manifest_path = Path("outputs/windows-native.wav.manifest.json")
+          result_path = Path("outputs/windows-result.json")
+
+          assert wav_path.exists() and wav_path.stat().st_size > 1000
+          assert manifest_path.exists()
+          assert result_path.exists()
+
+          with wave.open(str(wav_path), "rb") as wav:
+              assert wav.getnchannels() == 1
+              assert wav.getframerate() > 0
+              assert wav.getnframes() > 1000
+              print({"sample_rate": wav.getframerate(), "frames": wav.getnframes()})
+
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          assert manifest["engine"] == "pocket_tts", manifest["engine"]
+          print({"engine": manifest["engine"], "windows_native": True})
+          '@ | python -
+
+      - name: Upload native Windows evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ourtts-windows-native
+          path: outputs/
+          if-no-files-found: error
