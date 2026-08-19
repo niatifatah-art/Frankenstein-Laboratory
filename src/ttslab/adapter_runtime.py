@@ -10,6 +10,7 @@ class RuntimeInputs:
     language: str | None = None
     voice: str | None = None
     reference: Path | None = None
+    voice_state: Path | None = None
     controls: dict[str, Any] | None = None
 
 
@@ -75,6 +76,15 @@ _REFERENCE_SUPPORT = frozenset(
     }
 )
 
+_VOICE_STATE_SUPPORT = frozenset(
+    {
+        "chatterbox_base",
+        "chatterbox_nano",
+        "chatterbox_turbo",
+        "chatterbox_v3",
+    }
+)
+
 
 def adapter_supported_controls(engine_key: str) -> frozenset[str]:
     """Return normalized controls that this adapter actually translates today."""
@@ -86,20 +96,31 @@ def adapter_supports_reference(engine_key: str) -> bool:
     return engine_key in _REFERENCE_SUPPORT
 
 
+def adapter_supports_voice_state(engine_key: str) -> bool:
+    """Return whether the adapter executes a backend-specific prepared VoicePack state."""
+    return engine_key in _VOICE_STATE_SUPPORT
+
+
 def adapter_args(engine_key: str, inputs: RuntimeInputs) -> list[str]:
     """Translate normalized OurTTS inputs into one worker's explicit CLI arguments.
 
     This mapping is deliberately small and auditable. Unknown controls are rejected instead of
-    being silently dropped. A few legacy backend-specific controls remain accepted for the
-    Chatterbox Base adapter until normalized mappings replace them.
+    being silently dropped. Prepared voice states are backend-specific and mutually exclusive
+    with raw references.
     """
     args: list[str] = []
     language = inputs.language.casefold() if inputs.language else None
     controls = inputs.controls or {}
 
+    if inputs.reference is not None and inputs.voice_state is not None:
+        raise ValueError("Reference audio and prepared voice state are mutually exclusive.")
     if inputs.reference is not None and not adapter_supports_reference(engine_key):
         raise ValueError(
             f"Adapter {engine_key!r} does not consume reference audio; refusing to ignore it."
+        )
+    if inputs.voice_state is not None and not adapter_supports_voice_state(engine_key):
+        raise ValueError(
+            f"Adapter {engine_key!r} does not consume prepared voice state; refusing to ignore it."
         )
 
     if engine_key == "pocket_tts":
@@ -129,15 +150,13 @@ def adapter_args(engine_key: str, inputs: RuntimeInputs) -> list[str]:
         _reject_unknown_controls(engine_key, controls, set())
         if language:
             args.extend(["--language", language])
-        if inputs.reference:
-            args.extend(["--reference", str(inputs.reference)])
+        _append_voice_material(args, inputs)
         return args
 
     if engine_key in {"chatterbox_base", "chatterbox_nano", "chatterbox_turbo"}:
         allowed = {"exaggeration", "cfg_weight"} if engine_key == "chatterbox_base" else set()
         _reject_unknown_controls(engine_key, controls, allowed)
-        if inputs.reference:
-            args.extend(["--reference", str(inputs.reference)])
+        _append_voice_material(args, inputs)
         if engine_key == "chatterbox_base":
             if "exaggeration" in controls:
                 args.extend(["--exaggeration", str(float(controls["exaggeration"]))])
@@ -171,6 +190,13 @@ def adapter_args(engine_key: str, inputs: RuntimeInputs) -> list[str]:
 
 def engine_requires_reference(engine_key: str) -> bool:
     return engine_key == "qwen3_base_06b"
+
+
+def _append_voice_material(args: list[str], inputs: RuntimeInputs) -> None:
+    if inputs.reference is not None:
+        args.extend(["--reference", str(inputs.reference)])
+    elif inputs.voice_state is not None:
+        args.extend(["--voice-state", str(inputs.voice_state)])
 
 
 def _append_language(args: list[str], language: str | None, mapping: dict[str, str]) -> None:
