@@ -24,7 +24,9 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install Studio and test dependencies
-        run: python -m pip install -e ".[dev,studio]"
+        run: |
+          python -m pip install -e ".[dev,studio]"
+          python -m pip install httpx2
       - name: Ruff
         run: ruff check .
       - name: Studio tests
