@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .synthesis import SynthesisRequest, SynthesisResult, synthesize
 
@@ -35,13 +36,13 @@ def run_batch(
         raise ValueError("Unsupported batch manifest schema.")
     jobs = raw.get("jobs", [])
     if not isinstance(jobs, list):
-        raise ValueError("Batch manifest jobs must be a list.")
+        raise TypeError("Batch manifest jobs must be a list.")
 
     results: list[dict[str, Any]] = []
     failed = 0
     for index, job in enumerate(jobs):
         if not isinstance(job, dict):
-            raise ValueError(f"Batch job {index} must be an object.")
+            raise TypeError(f"Batch job {index} must be an object.")
         job_id = str(job.get("id", index))
         try:
             result = synth(_request_from_job(job, output_root))
