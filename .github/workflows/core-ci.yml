@@ -27,3 +27,5 @@ jobs:
         run: |
           python -m ttslab list
           python -m ttslab doctor
+          ourtts
+          ourtts --model atom --json

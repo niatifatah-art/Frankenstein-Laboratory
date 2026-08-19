@@ -1,0 +1,80 @@
+name: ourtts-v06-acceptance
+
+on:
+  push:
+    branches: ["ourtts-v06-product-foundation"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  product-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Core, API, and worker tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng
+          python -m pip install --upgrade uv
+          python -m pip install -e ".[dev,api]"
+      - name: Static and unit/API checks
+        run: |
+          ruff check .
+          pytest -q tests
+          pytest -q tests_api
+      - name: Product contract smoke
+        run: |
+          ourtts --model atom --json
+          ourtts plan --text "Hello from ourTTS." --language en --quality auto --json
+          python - <<'PY'
+          from ttslab.product_api import create_app
+          schema = create_app().openapi()
+          assert schema["info"]["title"] == "ourTTS"
+          assert "/v1/plan" in schema["paths"]
+          assert "/v1/generate" in schema["paths"]
+          assert "/v1/voices" in schema["paths"]
+          PY
+      - name: Real Auto generation through product boundary
+        run: |
+          mkdir -p outputs/v06-acceptance
+          ourtts generate \
+            --text "Hello from ourTTS. Auto should turn this simple request into real audio." \
+            --language en \
+            --quality auto \
+            --output outputs/v06-acceptance/hello.wav \
+            --manifest outputs/v06-acceptance/hello.manifest.json \
+            --json > outputs/v06-acceptance/result.json
+      - name: Validate WAV and routing evidence
+        run: |
+          python - <<'PY'
+          import json
+          import wave
+          from pathlib import Path
+
+          root = Path("outputs/v06-acceptance")
+          result = json.loads((root / "result.json").read_text())
+          manifest = json.loads((root / "hello.manifest.json").read_text())
+          assert result["status"] == "completed", result
+          assert result["engine"] == "pocket_tts", result
+          assert result["routing_reasons"], result
+          assert manifest["engine"] == "pocket_tts", manifest
+          assert manifest["metadata"]["product"]["name"] == "ourTTS"
+          assert manifest["metadata"]["product"]["routing"]["quality_mode"] == "auto"
+          with wave.open(str(root / "hello.wav"), "rb") as wav:
+              assert wav.getnframes() > 1000
+              assert wav.getframerate() > 0
+              assert wav.getnchannels() == 1
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ourtts-v06-acceptance
+          path: outputs/v06-acceptance/
+          if-no-files-found: warn
+          retention-days: 14
