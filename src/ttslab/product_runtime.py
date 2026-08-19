@@ -10,13 +10,26 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .adapter_runtime import adapter_supports_voice_state
 from .pipeline import required_capabilities_for_controls
 from .product import PRODUCT_NAME
 from .product_contract import GenerationRequest, ResolvedGeneration
 from .quality import QualityEvidence, load_quality_ledger
+from .registry import EngineRecord
 from .rendering import choose_render_engine, render_text
 from .router import RouteRequest, route_engines
 from .voicepack import VoicePack
+
+
+@dataclass(frozen=True, slots=True)
+class _ResolvedVoice:
+    reference: Path | None
+    reference_sha256: str | None
+    voice_id: str | None
+    controls: dict[str, Any]
+    metadata: dict[str, Any]
+    pack: VoicePack | None
+    root: Path | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +38,7 @@ class ProductGenerationPlan:
     engine: str
     controls: dict[str, Any]
     reference: Path | None
+    voice_state: Path | None
     voice_id: str | None
     max_generation_rtf: float | None
     routing_reasons: tuple[str, ...]
@@ -36,6 +50,7 @@ class ProductGenerationPlan:
             "engine": self.engine,
             "controls": dict(self.controls),
             "reference": str(self.reference) if self.reference else None,
+            "voice_state": str(self.voice_state) if self.voice_state else None,
             "voice_id": self.voice_id,
             "max_generation_rtf": self.max_generation_rtf,
             "routing_reasons": self.routing_reasons,
@@ -51,10 +66,7 @@ def _quality_rtf_limit(quality: str) -> float | None:
     raise ValueError(f"Unsupported quality mode: {quality!r}")
 
 
-def _resolve_voicepack(
-    request: GenerationRequest,
-    root: Path | None,
-) -> tuple[Path | None, str | None, dict[str, Any], dict[str, Any]]:
+def _resolve_voicepack(request: GenerationRequest, root: Path | None) -> _ResolvedVoice:
     if root is None:
         if request.voice is not None:
             raise ValueError(
@@ -64,7 +76,7 @@ def _resolve_voicepack(
         controls = dict(request.controls)
         if request.style != "natural":
             controls.setdefault("style", request.style)
-        return None, None, controls, {}
+        return _ResolvedVoice(None, None, None, controls, {}, None, None)
 
     root = root.resolve()
     pack = VoicePack.load(root)
@@ -96,7 +108,15 @@ def _resolve_voicepack(
             "provenance": pack.provenance,
         }
     }
-    return selection.path, pack.voice_id, controls, metadata
+    return _ResolvedVoice(
+        selection.path,
+        selection.clip.sha256.lower(),
+        pack.voice_id,
+        controls,
+        metadata,
+        pack,
+        root,
+    )
 
 
 def _required_capabilities(reference: Path | None, controls: dict[str, Any]) -> set[str]:
@@ -186,6 +206,43 @@ def _routing_evidence(
     return ("qualified by rendering contract",)
 
 
+def _prepared_state_for_engine(
+    voice: _ResolvedVoice,
+    engine: EngineRecord,
+) -> tuple[Path | None, dict[str, Any]]:
+    if voice.pack is None or voice.root is None:
+        return None, {"status": "not_requested"}
+    selection = voice.pack.resolve_backend_state(voice.root, engine.key, verify_hash=True)
+    if selection is None:
+        return None, {"status": "not_prepared", "engine": engine.key}
+    state = selection.state
+    summary: dict[str, Any] = {
+        "status": "available",
+        "engine": state.engine,
+        "path": state.path,
+        "sha256": state.sha256,
+        "format": state.format,
+        "model_revision": state.model_revision,
+        "adapter_version": state.adapter_version,
+        "source_reference_sha256": state.source_reference_sha256,
+    }
+    if not adapter_supports_voice_state(engine.key):
+        summary["status"] = "adapter_not_supported"
+        return None, summary
+    if state.model_revision and engine.source_revision and state.model_revision != engine.source_revision:
+        summary["status"] = "stale_model_revision"
+        return None, summary
+    if (
+        state.source_reference_sha256
+        and voice.reference_sha256
+        and state.source_reference_sha256.lower() != voice.reference_sha256.lower()
+    ):
+        summary["status"] = "stale_reference"
+        return None, summary
+    summary["status"] = "used"
+    return selection.path, summary
+
+
 def plan_generation(
     request: GenerationRequest,
     *,
@@ -193,25 +250,22 @@ def plan_generation(
     quality_ledger_path: Path | None = None,
 ) -> ProductGenerationPlan:
     max_generation_rtf = _quality_rtf_limit(request.quality)
-    reference, voice_id, controls, voicepack_metadata = _resolve_voicepack(
-        request,
-        voicepack_root,
-    )
+    voice = _resolve_voicepack(request, voicepack_root)
 
     quality_evidence: QualityEvidence | None = None
     if request.quality == "best":
         engine_key, quality_evidence = _choose_best_engine(
             language=request.language,
-            reference=reference,
-            controls=controls,
+            reference=voice.reference,
+            controls=voice.controls,
             quality_ledger_path=quality_ledger_path,
         )
         engine = choose_render_engine(
             language=request.language,
             explicit_engine=engine_key,
-            reference=reference,
+            reference=voice.reference,
             max_generation_rtf=None,
-            controls=controls,
+            controls=voice.controls,
         )
         reasons = (
             f"measured Best score {quality_evidence.score:.2f}/100",
@@ -224,17 +278,31 @@ def plan_generation(
         engine = choose_render_engine(
             language=request.language,
             explicit_engine=None,
-            reference=reference,
+            reference=voice.reference,
             max_generation_rtf=max_generation_rtf,
-            controls=controls,
+            controls=voice.controls,
         )
         reasons = _routing_evidence(
             engine_key=engine.key,
             language=request.language,
-            reference=reference,
-            controls=controls,
+            reference=voice.reference,
+            controls=voice.controls,
             max_generation_rtf=max_generation_rtf,
         )
+
+    voice_state, state_metadata = _prepared_state_for_engine(voice, engine)
+    reference = voice.reference
+    if voice_state is not None:
+        choose_render_engine(
+            language=request.language,
+            explicit_engine=engine.key,
+            reference=None,
+            voice_state=voice_state,
+            max_generation_rtf=max_generation_rtf,
+            controls=voice.controls,
+        )
+        reference = None
+        reasons = (*reasons, "using verified prepared VoicePack state")
 
     metadata: dict[str, Any] = {
         "product": {
@@ -250,13 +318,16 @@ def plan_generation(
             },
         }
     }
-    metadata.update(voicepack_metadata)
+    metadata.update(voice.metadata)
+    if "voicepack" in metadata:
+        metadata["voicepack"]["prepared_state"] = state_metadata
     return ProductGenerationPlan(
         request=request,
         engine=engine.key,
-        controls=controls,
+        controls=voice.controls,
         reference=reference,
-        voice_id=voice_id,
+        voice_state=voice_state,
+        voice_id=voice.voice_id,
         max_generation_rtf=max_generation_rtf,
         routing_reasons=reasons,
         metadata=metadata,
@@ -287,6 +358,7 @@ def generate(
         engine_key=plan.engine,
         voice=None,
         reference=plan.reference,
+        voice_state=plan.voice_state,
         controls=plan.controls,
         max_generation_rtf=plan.max_generation_rtf,
         manifest_path=manifest_path,
