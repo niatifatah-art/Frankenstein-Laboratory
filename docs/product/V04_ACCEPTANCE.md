@@ -16,7 +16,7 @@ Items are not considered complete because code exists; runtime items require Git
 - [ ] Exact 320 ms digital pause survives in the final rendered PCM output.
 - [ ] Existing real Pocket TTS benchmark contract still passes.
 - [ ] Pocket TTS VoicePack exported state path passes a real smoke test and reuses the exported state.
-- [ ] VoxCPM2 natural-language Voice Design passes a real targeted smoke and retains an artifact.
+- [x] VoxCPM2 natural-language Voice Design passed a real targeted smoke on run `32263946129` after the seed fix.
 - [ ] Unknown-rights cloning reference is blocked by default.
 - [ ] Batch manifest path is covered by unit tests.
 - [ ] Content-addressed cache path is covered by unit tests.
@@ -24,14 +24,18 @@ Items are not considered complete because code exists; runtime items require Git
 
 ## Candidate evidence before final revalidation
 
-The first v0.4 candidate already proved the broad owned path before the final Vox/VoicePack hardening:
+The v0.4 candidate has already proved the broad owned path:
 
-- Core run `32263477847`: success on Python 3.11, 3.12 and 3.13 after the Ruff fixes.
-- Lab E2E run `32263477911`: success, including real `ourtts speak`, Kokoro pronunciation path,
+- Core run `32263946171`: success on Python 3.11, 3.12 and 3.13, including Ruff, full pytest,
+  research CLI smoke and product CLI smoke.
+- Lab E2E run `32263946134`: success, including real `ourtts speak`, Kokoro pronunciation path,
   exact 320 ms digital pause validation, and the retained Pocket benchmark contract.
-- VoxCPM2 targeted run `32263477894`: failed for one concrete upstream-contract reason —
-  `VoxCPM._generate()` does not accept a `seed` keyword. v0.4 now seeds PyTorch externally and
-  removes that unsupported argument; the final targeted rerun must prove the corrected path.
+- VoxCPM2 targeted run `32263946129`: success after moving deterministic seeding outside the
+  unsupported `VoxCPM.generate()` keyword contract.
+- Pocket state run `32263946150` exposed an external access boundary: reference-audio state export
+  requires accepting the gated Pocket cloning weights and authenticating with Hugging Face. v0.4 now
+  reports that requirement explicitly and verifies the same official export/reuse format with an
+  ungated catalog voice. The final rerun must prove that catalog-state path.
 
 ## Evidence already reconciled
 
