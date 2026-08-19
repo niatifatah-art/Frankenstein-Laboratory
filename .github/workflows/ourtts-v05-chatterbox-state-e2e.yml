@@ -1,0 +1,166 @@
+name: ourtts-v05-chatterbox-state-e2e
+
+on:
+  pull_request:
+    paths:
+      - "src/ttslab/voicepack.py"
+      - "src/ttslab/voice_state.py"
+      - "src/ttslab/isolation.py"
+      - "src/ttslab/adapter_args.py"
+      - "src/ttslab/synthesis.py"
+      - "src/ttslab/user_cli.py"
+      - "engines/chatterbox/**"
+      - ".github/workflows/ourtts-v05-chatterbox-state-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepared-state:
+    name: VoicePack -> Chatterbox state -> unified ourTTS WAV
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Core and isolated worker tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng
+          python -m pip install --upgrade uv
+          python -m pip install -e ".[dev]"
+      - name: Create controlled synthetic reference
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/v05-voice/refs
+          uv run --project engines/kokoro python engines/kokoro/runner.py \
+            --voice bm_fable --language b \
+            --text "This is a controlled synthetic reference created inside the laboratory. It is deliberately longer than five seconds so reusable voice preparation can be tested without using a real person's voice." \
+            --output outputs/v05-voice/refs/reference.wav \
+            > outputs/v05-voice/reference-generation.json
+      - name: Build provenance-aware VoicePack
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("outputs/v05-voice")
+          ref = root / "refs/reference.wav"
+          digest = hashlib.sha256(ref.read_bytes()).hexdigest()
+          payload = {
+              "schema_version": 1,
+              "voice_id": "lab_prepared_fable",
+              "display_name": "Lab Prepared Fable",
+              "languages": ["en"],
+              "references": [{
+                  "path": "refs/reference.wav",
+                  "sha256": digest,
+                  "license": "generated-in-lab",
+                  "source": "Kokoro bm_fable controlled synthetic reference",
+                  "consent": "synthetic",
+              }],
+              "backend_states": [],
+              "style_presets": {},
+              "provenance": {"synthetic": True, "purpose": "ourTTS v0.5 prepared-state E2E"},
+          }
+          (root / "voicepack.json").write_text(json.dumps(payload, indent=2) + "\n")
+          PY
+          python -m ttslab voicepack-check outputs/v05-voice
+      - name: Prepare reusable Chatterbox Nano state
+        run: |
+          set -euo pipefail
+          ourtts voice-state \
+            --voicepack outputs/v05-voice \
+            --engine chatterbox_nano \
+            --device cpu \
+            --timeout 2400 \
+            > outputs/v05-voice/state-result.json
+      - name: Validate state provenance and hash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("outputs/v05-voice")
+          pack = json.loads((root / "voicepack.json").read_text())
+          result = json.loads((root / "state-result.json").read_text())
+          assert len(pack["backend_states"]) == 1, pack
+          state = pack["backend_states"][0]
+          assert state["engine"] == "chatterbox_nano"
+          assert state["format"] == "chatterbox-conditionals-pt-v1"
+          assert state["adapter_version"] == "0.2.0"
+          assert state["model_revision"] == "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+          state_path = root / state["path"]
+          assert state_path.is_file()
+          assert hashlib.sha256(state_path.read_bytes()).hexdigest() == state["sha256"]
+          assert result["sha256"] == state["sha256"]
+          ref_hash = hashlib.sha256((root / "refs/reference.wav").read_bytes()).hexdigest()
+          assert state["source_reference_sha256"] == ref_hash
+          PY
+      - name: Prove upstream worker reloads prepared state
+        run: |
+          set -euo pipefail
+          uv run --project engines/chatterbox python engines/chatterbox/runner.py \
+            --variant nano \
+            --text "This sentence is generated from the prepared state." \
+            --voice-state outputs/v05-voice/states/chatterbox_nano.conds.pt \
+            --device cpu \
+            --output outputs/v05-voice/direct-state.wav \
+            > outputs/v05-voice/direct-state.json
+          python - <<'PY'
+          import json
+          import wave
+          from pathlib import Path
+          root = Path("outputs/v05-voice")
+          payload = json.loads((root / "direct-state.json").read_text())
+          assert payload["engine"] == "chatterbox_nano"
+          assert payload["voice_state"]
+          assert payload["reference"] is None
+          assert payload["voice_state_load_seconds"] is not None
+          with wave.open(str(root / "direct-state.wav"), "rb") as wav:
+              assert wav.getnframes() > 1000
+              assert wav.getnchannels() == 1
+          PY
+      - name: Generate through unified ourTTS path
+        run: |
+          set -euo pipefail
+          ourtts speak \
+            --text "The reference was prepared once. ourTTS should now reuse its cached identity state." \
+            --output outputs/v05-voice/unified.wav \
+            --language en \
+            --engine chatterbox_nano \
+            --profile voice_clone \
+            --voicepack outputs/v05-voice \
+            --device cpu \
+            --timeout 2400 \
+            > outputs/v05-voice/unified-result.json
+      - name: Validate unified result and regression suite
+        run: |
+          python - <<'PY'
+          import json
+          import wave
+          from pathlib import Path
+          root = Path("outputs/v05-voice")
+          result = json.loads((root / "unified-result.json").read_text())
+          assert result["engine"] == "chatterbox_nano", result
+          provenance = result["reference_provenance"]
+          assert provenance["backend_state"]["engine"] == "chatterbox_nano"
+          assert provenance["backend_state"]["path"].endswith("chatterbox_nano.conds.pt")
+          with wave.open(str(root / "unified.wav"), "rb") as wav:
+              assert wav.getnframes() > 1000
+              assert wav.getnchannels() == 1
+          PY
+          ruff check .
+          pytest -q tests
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ourtts-v05-chatterbox-state-e2e
+          path: outputs/v05-voice/
+          if-no-files-found: error
+          retention-days: 14
