@@ -100,7 +100,7 @@ def prepare_voicepack_state(
             )
         payload = execution.payload
         if not isinstance(payload, dict):
-            raise RuntimeError(f"{engine_key} voice preparation returned no structured payload.")
+            raise TypeError(f"{engine_key} voice preparation returned no structured payload.")
         _validate_payload(engine_key, engine.source_revision, temporary_path, payload)
 
         state_format = str(payload["state_format"])
