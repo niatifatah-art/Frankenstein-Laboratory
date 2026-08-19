@@ -6,13 +6,52 @@
 
 ourTTS should expose a tiny default workflow even when the backend contains many engines, models, controls, caches, and routing rules.
 
+## Current v0.6 implementation
+
+The product path is now executable rather than only conceptual:
+
+```text
+text + voice + feel + quality
+        ↓
+GenerationRequest
+        ↓
+ourTTS product router
+        ↓
+verified Core adapter
+        ↓
+real WAV + manifest
+```
+
+Available product surfaces on this branch:
+
+- `ourtts plan` previews the verified route without running a model.
+- `ourtts generate` renders a real WAV through the product contract.
+- `ourtts-api` starts a local FastAPI service at `127.0.0.1:7860`.
+- `/` serves the first lightweight Studio UI from the same local service.
+- `/v1/voices` exposes a managed local VoicePack library from `voices/`.
+- browser clients pass a stable `voice_id`; they never pass arbitrary filesystem paths.
+- generated audio and manifests receive safe opaque artifact IDs and same-origin URLs.
+
+Install the optional local API/Studio dependencies and start it:
+
+```bash
+python -m pip install -e ".[dev,api]"
+ourtts-api
+```
+
+Then open `http://127.0.0.1:7860/`.
+
+The default Studio keeps engine names out of the primary controls. Routing detail is available only under **Why this route?**.
+
+`Best` remains deliberately disabled until a common measured quality score exists. We do not relabel the fastest backend as the best-sounding backend.
+
 ## Default generation flow
 
-The first usable Studio should fit on one primary screen:
+The first usable Studio fits on one primary screen:
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ ourTTS                                         Project ▾     │
+│ ourTTS                                           Local ●     │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
 │  What should it say?                                         │
@@ -21,17 +60,16 @@ The first usable Studio should fit on one primary screen:
 │  │                                                        │  │
 │  └────────────────────────────────────────────────────────┘  │
 │                                                              │
-│  Voice                 Feel                  Quality          │
-│  [ My voice       ▾ ]   [ Natural ]          [ Auto      ▾ ] │
-│                        [ Energetic ]                           │
-│                        [ Calm ]                               │
+│  Voice          Language        Feel             Quality     │
+│  [ Default ▾ ]  [ English ▾ ]   [ Natural ]      [ Auto ▾ ] │
+│                                  [ Energetic ]                │
+│                                  [ Calm ]                     │
 │                                                              │
 │                                      [ ▶ Generate ]          │
-│                                                              │
 ├──────────────────────────────────────────────────────────────┤
 │  Result                                                      │
 │  ▶  ━━━━━━━●━━━━━━━━━━━━━━━━━━━━━━━━━━━━  0:07               │
-│  [ Regenerate ] [ Fix pronunciation ] [ More controls ]      │
+│  Why this route? ▸                                           │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -71,10 +109,10 @@ Avoid raw stack traces in product UI.
 
 Preferred state language:
 
-- `Getting your voice ready…`
-- `Making the first audio…`
-- `Almost there…`
-- `Ready`.
+- `Finding the right route…`
+- `Preparing your voice…`
+- `Generating your voice…`
+- `Ready to play`.
 
 When failure occurs, say what the user can do next:
 
@@ -86,12 +124,12 @@ Preserve technical error evidence in diagnostics/logs, not as the primary user m
 
 ## Model selection UX
 
-The default selector should be about intent, not implementation:
+The default selector is about intent, not implementation:
 
-- **Auto** — best fit for the request/device
-- **Fast** — prioritize latency
-- **Best** — prioritize measured quality
-- **Local** — stay offline/local
+- **Auto** — choose a verified fit for the request/device
+- **Fast** — require measured realtime-or-better CPU generation in the current first policy
+- **Best** — reserved for measured quality ranking; currently disabled
+- **Local** — request local/offline inference behavior
 
 Model-family names such as Atom, Nano, Core, and Pro may appear in an optional model manager or Expert mode. As owned checkpoints mature, they can become friendly downloadable presets without changing the generation workflow.
 
@@ -100,6 +138,18 @@ Model-family names such as Atom, Nano, Core, and Pro may appear in an optional m
 Voice identity and style are separate.
 
 A VoicePack is shown as one voice. A user should not see duplicate entries such as `My Voice - Calm`, `My Voice - Excited`, etc. Style changes how the identity speaks.
+
+The current local library is intentionally simple:
+
+```text
+voices/
+  my_voice/
+    voicepack.json
+    refs/
+      reference.wav
+```
+
+The API validates VoicePack files/hashes before presenting them as ready. The product path keeps unknown-consent references blocked.
 
 Creating a voice should eventually be a guided flow:
 
@@ -144,18 +194,20 @@ The default UI can hide most of this, while Expert mode makes it inspectable.
 - clear typography
 - one strong primary action
 - restrained use of accent color
-- waveform/audio is the visual hero after generation
+- audio playback is the visual hero after generation
 - no wall of sliders on first load
 - subtle motion only when it communicates progress
 - mobile usable from the beginning
+- light/dark mode follows the operating system automatically in the first Studio
 
-## First implementation milestones
+## Implementation milestones
 
-1. Product/model-family manifest + friendly CLI (v0.6 foundation).
-2. Freeze simple generation request/response contract.
-3. Build a lightweight local API facade over the existing Core.
-4. Make one default `auto` path produce real audio through a qualified backend.
-5. Add VoicePack selection through the API.
-6. Build a minimal Studio against that API.
-7. Validate desktop and mobile flows.
-8. Only then add accounts/history/cloud services and advanced editing.
+1. Product/model-family manifest + friendly CLI. **Done in v0.6 branch.**
+2. Freeze simple generation request/response contract. **Done.**
+3. Build a lightweight local API facade over the existing Core. **Done, optional FastAPI extra.**
+4. Make one default `auto` path produce real audio through a qualified backend. **Implemented; real-model CI is the acceptance gate.**
+5. Add VoicePack selection through the API. **Implemented as managed `voice_id` library.**
+6. Build a minimal Studio against that API. **Implemented as the first lightweight local shell.**
+7. Validate desktop/mobile behavior and real generation end-to-end. **In progress.**
+8. Add quality evaluation so `Best` becomes evidence-backed. **Next.**
+9. Add pronunciation repair, prepared voice states, streaming, history/projects, then cloud services.
