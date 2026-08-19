@@ -71,6 +71,7 @@ def compile_adapter_args(
     language: str | None = None,
     voice: str | None = None,
     reference: Path | None = None,
+    voice_state: Path | None = None,
     reference_text: str | None = None,
     voice_design: str | None = None,
     style: str | None = None,
@@ -79,12 +80,17 @@ def compile_adapter_args(
 ) -> AdapterArguments:
     """Translate stable OurTTS concepts into one worker's explicit CLI contract.
 
-    Unsupported concepts are returned rather than silently discarded.
+    Unsupported concepts are returned rather than silently discarded. Prepared backend voice
+    state is deliberately separate from raw reference audio so binary state is never passed to an
+    adapter as if it were a WAV.
     """
     key = engine.key
     args: list[str] = []
     unsupported: list[str] = []
     effective_language: str | None = None
+
+    if reference is not None and voice_state is not None:
+        raise ValueError("reference audio and prepared voice state are mutually exclusive")
 
     if language:
         if key == "kokoro":
@@ -125,12 +131,20 @@ def compile_adapter_args(
             effective_language = language
 
     if voice:
-        if key == "kokoro" or (key == "pocket_tts" and reference is None):
+        if key == "kokoro" or (key == "pocket_tts" and reference is None and voice_state is None):
             args += ["--voice", voice]
         elif key == "qwen3_custom_06b":
             args += ["--speaker", voice]
         else:
             unsupported.append("voice")
+
+    if voice_state is not None:
+        if key.startswith("chatterbox_"):
+            _add_path(args, "--voice-state", voice_state)
+        elif key == "pocket_tts":
+            args += ["--voice", str(voice_state.resolve())]
+        else:
+            unsupported.append("voice_state")
 
     if reference is not None:
         if key == "pocket_tts":
