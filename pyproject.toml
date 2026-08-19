@@ -24,13 +24,13 @@ ourtts = "ttslab.product_cli:main"
 ourtts-api = "ttslab.product_api:main"
 
 [tool.setuptools]
-package-dir = {"" = "src"]
+package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-ttslab = ["studio/*.html", "studio/*.css", "studio/*.js"]
+tslab = ["studio/*.html", "studio/*.css", "studio/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
