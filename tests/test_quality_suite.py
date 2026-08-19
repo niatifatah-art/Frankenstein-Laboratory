@@ -90,7 +90,7 @@ def test_listening_packet_hides_engine_identity_and_is_deterministic() -> None:
     assert mapping_a == mapping_b
     assert len(packet_a["samples"]) == 2
     assert "engine" not in packet_a["samples"][0]
-    assert set(mapping_a["mapping"].values())
+    assert len(mapping_a["mapping"]) == 2
     assert {value["engine"] for value in mapping_a["mapping"].values()} == {
         "kokoro",
         "pocket_tts",
