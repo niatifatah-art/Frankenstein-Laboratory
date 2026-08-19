@@ -13,6 +13,7 @@ from .pipeline import build_synthesis_plan
 from .pronunciation import PronunciationLexicon
 from .prosody import ProsodyTimeline, parse_control_markup
 from .registry import get_engine, load_registry, validate_registry
+from .rendering import render_text
 from .router import RouteRequest, route_engines
 from .text_engine import prepare_text
 from .voicepack import VoicePack
@@ -267,6 +268,29 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_synthesize(args: argparse.Namespace) -> int:
+    try:
+        manifest = render_text(
+            args.text,
+            args.output,
+            language=args.language,
+            engine_key=args.engine,
+            voice=args.voice,
+            reference=args.reference,
+            lexicon=_load_lexicon(args.lexicon),
+            max_generation_rtf=args.max_generation_rtf,
+            engine_args=args.engine_arg,
+            manifest_path=args.manifest,
+            keep_parts=args.keep_parts,
+            timeout_seconds=args.timeout,
+        )
+    except (KeyError, RuntimeError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 5
+    print(json.dumps(manifest, ensure_ascii=False))
+    return 0
+
+
 def _add_generation_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("engine")
     parser.add_argument("--text", required=True)
@@ -354,6 +378,24 @@ def build_parser() -> argparse.ArgumentParser:
     plan_parser.add_argument("--control", action="append", default=[])
     plan_parser.add_argument("--max-generation-rtf", type=float)
     plan_parser.set_defaults(func=_cmd_plan)
+
+    synth_parser = sub.add_parser(
+        "synthesize",
+        help="Render text through the owned OurTTS pipeline and a qualified backend.",
+    )
+    synth_parser.add_argument("--text", required=True)
+    synth_parser.add_argument("--output", type=Path, required=True)
+    synth_parser.add_argument("--language")
+    synth_parser.add_argument("--engine")
+    synth_parser.add_argument("--voice")
+    synth_parser.add_argument("--reference", type=Path)
+    synth_parser.add_argument("--lexicon", type=Path)
+    synth_parser.add_argument("--max-generation-rtf", type=float)
+    synth_parser.add_argument("--manifest", type=Path)
+    synth_parser.add_argument("--keep-parts", action="store_true")
+    synth_parser.add_argument("--timeout", type=float, default=1800.0)
+    synth_parser.add_argument("--engine-arg", action="append", default=[])
+    synth_parser.set_defaults(func=_cmd_synthesize)
     return parser
 
 

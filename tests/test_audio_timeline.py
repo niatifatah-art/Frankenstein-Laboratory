@@ -25,6 +25,7 @@ def test_pcm_concatenation_inserts_exact_silence(tmp_path: Path) -> None:
     info = concatenate_pcm_wavs(
         [AudioPart(first, silence_after_ms=250), AudioPart(second)],
         output,
+        leading_silence_ms=50,
     )
     assert info.sample_rate == 1000
-    assert info.frames == 100 + 250 + 200
+    assert info.frames == 50 + 100 + 250 + 200
