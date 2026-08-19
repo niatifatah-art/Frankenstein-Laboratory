@@ -288,7 +288,7 @@ def render_text(
                 retained_parts.append(str(destination))
 
     manifest: dict[str, Any] = {
-        "schema_version": 3,
+        "schema_version": 2,
         "engine": engine.key,
         "source_text": text,
         "clean_text": script.clean_text,
