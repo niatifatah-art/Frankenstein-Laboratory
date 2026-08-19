@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>ourTTS Studio</title>
+  <link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <div class="brand">ourTTS</div>
+        <div class="tagline">Make a voice. Make it yours.</div>
+      </div>
+      <div id="health" class="status-dot" title="Checking local engine">checking</div>
+    </header>
+
+    <section class="composer card">
+      <label class="eyebrow" for="text">What should it say?</label>
+      <textarea id="text" maxlength="50000" placeholder="Type or paste your text…">Yessss! [[pause:320ms]] It actually works.</textarea>
+      <div class="counter"><span id="count">0</span> characters</div>
+
+      <div class="controls-grid">
+        <label>
+          <span>Voice</span>
+          <select id="voice"><option value="">Default voice</option></select>
+        </label>
+        <label>
+          <span>Language</span>
+          <input id="language" value="en" placeholder="en" autocomplete="off" />
+        </label>
+        <label>
+          <span>Mode</span>
+          <select id="profile">
+            <option value="auto">Auto</option>
+            <option value="fast_cpu">Fast CPU</option>
+            <option value="balanced_cpu">Balanced CPU</option>
+            <option value="quality">Quality</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="feel-row">
+        <span class="label">Feel</span>
+        <div class="chips" role="group" aria-label="Voice feel">
+          <button class="chip active" data-style="natural" type="button">Natural</button>
+          <button class="chip" data-style="energetic" type="button">Energetic</button>
+          <button class="chip" data-style="calm" type="button">Calm</button>
+        </div>
+      </div>
+
+      <details class="advanced">
+        <summary>More controls</summary>
+        <div class="advanced-grid">
+          <label>
+            <span>Speed</span>
+            <input id="speed" type="range" min="0.6" max="1.4" step="0.05" value="1" />
+            <output id="speedValue">1.00×</output>
+          </label>
+          <label>
+            <span>Engine override</span>
+            <select id="engine"><option value="">Let ourTTS choose</option></select>
+          </label>
+        </div>
+        <p class="hint">Tip: use <code>[[pause:320ms]]</code> for exact digital silence.</p>
+      </details>
+
+      <div class="actions">
+        <button id="generate" class="generate" type="button">
+          <span class="play">▶</span>
+          <span>Generate</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="result" class="result card hidden" aria-live="polite">
+      <div class="result-head">
+        <div>
+          <div class="eyebrow">Your audio</div>
+          <div id="resultTitle" class="result-title">Ready</div>
+        </div>
+        <button id="regenerate" class="secondary" type="button">Regenerate</button>
+      </div>
+      <audio id="audio" controls preload="metadata"></audio>
+      <div class="result-meta">
+        <span id="engineBadge" class="badge"></span>
+        <span id="cacheBadge" class="badge muted"></span>
+      </div>
+      <details class="routing">
+        <summary>What did ourTTS do?</summary>
+        <pre id="details"></pre>
+      </details>
+    </section>
+
+    <section id="error" class="error card hidden" role="alert"></section>
+
+    <footer>
+      Local first. External engines stay isolated. Voice cloning only uses explicit VoicePack provenance.
+    </footer>
+  </main>
+  <script src="/assets/app.js"></script>
+</body>
+</html>
