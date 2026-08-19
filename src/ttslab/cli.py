@@ -411,7 +411,7 @@ def build_parser() -> argparse.ArgumentParser:
     route_parser.add_argument("--require", action="append", default=[])
     route_parser.add_argument("--prefer", action="append", default=[])
     route_parser.add_argument("--max-generation-rtf", type=float)
-    route_parser.add_argument("--allow-restricted-commercial_use", action="store_true")
+    route_parser.add_argument("--allow-restricted-commercial-use", action="store_true")
     route_parser.set_defaults(func=_cmd_route)
 
     text_parser = sub.add_parser("text", help="Run OurTTS text/pronunciation/control preprocessing.")
