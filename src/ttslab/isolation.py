@@ -80,8 +80,14 @@ def build_worker_command(
     phonemes: str | None = None,
     output: Path | None = None,
     describe: bool = False,
+    prepare_voice: bool = False,
+    reference: Path | None = None,
+    state_output: Path | None = None,
     extra_args: list[str] | None = None,
 ) -> tuple[str, ...]:
+    modes = int(describe) + int(prepare_voice)
+    if modes > 1:
+        raise ValueError("Worker operation must be describe, prepare_voice, or synthesis, not multiple.")
     if text is not None and phonemes is not None:
         raise ValueError("Worker input must be text or raw phonemes, not both.")
 
@@ -96,8 +102,29 @@ def build_worker_command(
         *worker.default_args,
     ]
     if describe:
+        if any(value is not None for value in (text, phonemes, output, reference, state_output)):
+            raise ValueError("Describe operation does not accept synthesis or voice-preparation inputs.")
         command.append("--describe")
+    elif prepare_voice:
+        if text is not None or phonemes is not None or output is not None:
+            raise ValueError("Voice preparation does not accept text, phonemes, or audio output.")
+        if reference is None or state_output is None:
+            raise ValueError("Voice preparation requires reference and state_output.")
+        command.extend(
+            [
+                "--prepare-voice",
+                "--reference",
+                str(reference),
+                "--state-output",
+                str(state_output),
+            ]
+        )
     else:
+        if reference is not None or state_output is not None:
+            raise ValueError(
+                "reference/state_output are voice-preparation command fields; "
+                "pass synthesis reference/state through adapter extra_args instead."
+            )
         if output is None or (text is None and phonemes is None):
             raise ValueError("text or phonemes plus output are required for synthesis")
         if phonemes is not None:
@@ -131,6 +158,9 @@ def execute_worker(
     phonemes: str | None = None,
     output: Path | None = None,
     describe: bool = False,
+    prepare_voice: bool = False,
+    reference: Path | None = None,
+    state_output: Path | None = None,
     extra_args: list[str] | None = None,
     timeout_seconds: float | None = None,
 ) -> WorkerExecution:
@@ -140,6 +170,9 @@ def execute_worker(
         phonemes=phonemes,
         output=output,
         describe=describe,
+        prepare_voice=prepare_voice,
+        reference=reference,
+        state_output=state_output,
         extra_args=extra_args,
     )
     completed = subprocess.run(
