@@ -2,7 +2,7 @@
 
 This file is the durable evidence checklist for the first coherent product-facing OurTTS path.
 Runtime claims below are backed by GitHub Actions evidence on the final v0.4 code candidate
-`bc126294f251d886db3bd04a428c490f51ba2100`; the later commits only reconcile documentation/evidence.
+`bc126294f251d886db3bd04a428c490f51ba2100`; later commits only reconcile documentation/evidence.
 
 ## Required product acceptance
 
