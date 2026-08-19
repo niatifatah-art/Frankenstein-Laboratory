@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -22,11 +22,7 @@ class ReferenceClip:
         _validate_relative_path(self.path)
         if self.consent not in _ALLOWED_CONSENT:
             raise ValueError(f"Unknown consent status: {self.consent!r}")
-        if self.sha256 and (
-            len(self.sha256) != 64
-            or any(c not in "0123456789abcdef" for c in self.sha256.lower())
-        ):
-            raise ValueError("Reference sha256 must be a 64-character hex digest.")
+        _validate_sha256(self.sha256, label="Reference")
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,19 +31,29 @@ class BackendVoiceState:
     path: str
     model_revision: str | None = None
     sha256: str | None = None
+    format: str | None = None
+    source_reference_sha256: str | None = None
+    adapter_version: str | None = None
 
     def __post_init__(self) -> None:
+        if not self.engine.strip():
+            raise ValueError("Backend state engine must not be empty.")
         _validate_relative_path(self.path)
-        if self.sha256 and (
-            len(self.sha256) != 64
-            or any(c not in "0123456789abcdef" for c in self.sha256.lower())
-        ):
-            raise ValueError("Backend state sha256 must be a 64-character hex digest.")
+        _validate_sha256(self.sha256, label="Backend state")
+        _validate_sha256(self.source_reference_sha256, label="Backend state source reference")
+        if self.format is not None and not self.format.strip():
+            raise ValueError("Backend state format must not be blank when provided.")
 
 
 @dataclass(frozen=True, slots=True)
 class VoiceReferenceSelection:
     clip: ReferenceClip
+    path: Path
+
+
+@dataclass(frozen=True, slots=True)
+class VoiceBackendStateSelection:
+    state: BackendVoiceState
     path: Path
 
 
@@ -70,6 +76,13 @@ class VoicePack:
             raise ValueError("voice_id must be a non-empty whitespace-free identifier.")
         if self.pronunciation_lexicon:
             _validate_relative_path(self.pronunciation_lexicon)
+        seen_states: set[str] = set()
+        for state in self.backend_states:
+            if state.engine in seen_states:
+                raise ValueError(
+                    f"VoicePack {self.voice_id!r} contains duplicate backend state for {state.engine!r}."
+                )
+            seen_states.add(state.engine)
         for name, controls in self.style_presets.items():
             if not name.strip():
                 raise ValueError("VoicePack style preset names must not be empty.")
@@ -93,7 +106,24 @@ class VoicePack:
 
     def save(self, root: Path) -> None:
         root.mkdir(parents=True, exist_ok=True)
-        payload = {
+        payload = self.to_dict()
+        (root / "voicepack.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+    def save_atomic(self, root: Path) -> None:
+        root.mkdir(parents=True, exist_ok=True)
+        destination = root / "voicepack.json"
+        temporary = root / ".voicepack.json.tmp"
+        temporary.write_text(
+            json.dumps(self.to_dict(), ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        temporary.replace(destination)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
             "schema_version": self.schema_version,
             "voice_id": self.voice_id,
             "display_name": self.display_name,
@@ -104,10 +134,6 @@ class VoicePack:
             "style_presets": self.style_presets,
             "provenance": self.provenance,
         }
-        (root / "voicepack.json").write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
 
     def validate_files(self, root: Path, *, verify_hashes: bool = True) -> tuple[str, ...]:
         errors: list[str] = []
@@ -161,6 +187,36 @@ class VoicePack:
         detail = "; ".join(failures) if failures else "no eligible reference"
         raise ValueError(f"VoicePack {self.voice_id!r} has no usable reference clip: {detail}")
 
+    def resolve_backend_state(
+        self,
+        root: Path,
+        engine: str,
+        *,
+        verify_hash: bool = True,
+    ) -> VoiceBackendStateSelection | None:
+        state = self.backend_state(engine)
+        if state is None:
+            return None
+        root = root.resolve()
+        path = (root / state.path).resolve()
+        if not path.is_relative_to(root):
+            raise ValueError(f"Backend state path escapes VoicePack root: {state.path}")
+        if not path.is_file():
+            raise ValueError(
+                f"VoicePack {self.voice_id!r} backend state for {engine!r} is missing: {state.path}"
+            )
+        if verify_hash and state.sha256 and _sha256(path) != state.sha256.lower():
+            raise ValueError(
+                f"VoicePack {self.voice_id!r} backend state hash mismatch for {engine!r}: {state.path}"
+            )
+        return VoiceBackendStateSelection(state=state, path=path)
+
+    def with_backend_state(self, state: BackendVoiceState) -> VoicePack:
+        states = [item for item in self.backend_states if item.engine != state.engine]
+        states.append(state)
+        states.sort(key=lambda item: item.engine)
+        return replace(self, backend_states=tuple(states))
+
     def style_controls(self, name: str | None) -> dict[str, Any]:
         if name is None:
             return {}
@@ -185,6 +241,13 @@ def _validate_relative_path(value: str) -> None:
     path = Path(value)
     if path.is_absolute() or ".." in path.parts:
         raise ValueError(f"VoicePack paths must stay relative to the pack root: {value!r}")
+
+
+def _validate_sha256(value: str | None, *, label: str) -> None:
+    if value and (
+        len(value) != 64 or any(c not in "0123456789abcdef" for c in value.lower())
+    ):
+        raise ValueError(f"{label} sha256 must be a 64-character hex digest.")
 
 
 def _sha256(path: Path) -> str:
