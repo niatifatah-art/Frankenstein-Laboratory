@@ -1,67 +1,12 @@
-name: voxcpm2-five-voices-retry
+name: voxcpm2-five-voices-retry-archived
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/voxcpm2-five-voices-retry.yml"
   workflow_dispatch:
 
-permissions:
-  contents: read
-
-env:
-  CAST_TEXT: >-
-    I had a terrible idea. What if instead of choosing one text to speech model,
-    I just used all of them? So I made Frankenstein Laboratory. And somehow,
-    it already speaks.
-
 jobs:
-  voxcpm:
+  evidence-note:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install CPU runtime and VoxCPM2
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch>=2.5' torchaudio
-          python -m pip install voxcpm soundfile
-      - name: Render five native Voice Design voices on CPU
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p outputs/voxcpm
-          python - <<'PY' | tee outputs/voxcpm/run.log
-          import os
-          import soundfile as sf
-          import torch
-          from voxcpm import VoxCPM
-          torch.set_num_threads(2)
-          model = VoxCPM.from_pretrained(
-              'openbmb/VoxCPM2', load_denoiser=False, optimize=False, device='cpu'
-          )
-          descriptions = [
-              'Young British male voice, playful, quick-witted, clear and natural',
-              'Young American male voice, energetic, warm and conversational',
-              'Calm young male narrator, slightly deep, intimate and clean',
-              'Playful young male creator voice, expressive, slightly sarcastic',
-              'Bright youthful male voice, fast but articulate, friendly and confident',
-          ]
-          for i, desc in enumerate(descriptions, 1):
-              wav = model.generate(
-                  text=f'({desc})' + os.environ['CAST_TEXT'],
-                  cfg_value=2.0,
-                  inference_timesteps=5,
-              )
-              sf.write(f'outputs/voxcpm/{i:02d}-voice-design.wav', wav, model.tts_model.sample_rate)
-              print(i, desc, len(wav), model.tts_model.sample_rate)
-          PY
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cast-voxcpm2-5-retry
-          path: outputs/voxcpm/
-          if-no-files-found: error
+      - run: |
+          echo "Historical five-voice VoxCPM2 cast archived after retained qualification evidence."
+          echo "Use voxcpm2-product-smoke for the current targeted Voice Design contract."

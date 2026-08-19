@@ -31,6 +31,7 @@ def _designed_text(text: str, instruction: str | None) -> str:
 
 def synthesize(args: argparse.Namespace) -> int:
     import soundfile as sf
+    import torch
     from voxcpm import VoxCPM
 
     output = args.output.resolve()
@@ -44,6 +45,7 @@ def synthesize(args: argparse.Namespace) -> int:
         device=args.device,
     )
     load_seconds = time.perf_counter() - load_started
+    torch.manual_seed(args.seed)
     generation_started = time.perf_counter()
     kwargs: dict[str, object] = {
         "text": _designed_text(args.text, args.voice_design),
@@ -53,7 +55,6 @@ def synthesize(args: argparse.Namespace) -> int:
         "normalize": True,
         "denoise": False,
         "retry_badcase": False,
-        "seed": args.seed,
     }
     if args.reference:
         reference = str(args.reference.resolve())

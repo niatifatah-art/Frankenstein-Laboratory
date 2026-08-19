@@ -1,0 +1,96 @@
+name: pocket-voice-state-smoke
+
+on:
+  pull_request:
+    paths:
+      - "src/ttslab/voice_state.py"
+      - "src/ttslab/voicepack.py"
+      - "engines/pocket_tts/export_voice.py"
+      - "engines/pocket_tts/runner.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-and-reuse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y espeak-ng
+      - run: python -m pip install --upgrade uv && python -m pip install -e ".[dev]"
+      - name: Create a controlled synthetic reference and VoicePack
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/voicepack/references outputs/generated
+          uv run --project engines/kokoro python engines/kokoro/runner.py \
+            --voice af_heart --language a \
+            --text "This synthetic voice belongs to the automated Frankenstein Laboratory test." \
+            --output outputs/voicepack/references/source.wav >/dev/null
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          ref = Path('outputs/voicepack/references/source.wav')
+          digest = hashlib.sha256(ref.read_bytes()).hexdigest()
+          payload = {
+              'schema_version': 1,
+              'voice_id': 'ci_synthetic_voice',
+              'display_name': 'CI synthetic voice',
+              'languages': ['en'],
+              'references': [{
+                  'path': 'references/source.wav',
+                  'sha256': digest,
+                  'license': 'synthetic-test-only',
+                  'source': 'Frankenstein Laboratory CI / Kokoro synthetic output',
+                  'consent': 'synthetic'
+              }],
+              'backend_states': [],
+              'style_presets': {},
+              'provenance': {'purpose': 'automated test'}
+          }
+          Path('outputs/voicepack/voicepack.json').write_text(json.dumps(payload, indent=2))
+          PY
+      - name: Export reusable Pocket state through OurTTS VoicePack boundary
+        run: |
+          ourtts voice-state \
+            --voicepack outputs/voicepack \
+            --engine pocket_tts \
+            --language en \
+            | tee outputs/voice-state.json
+      - name: Reuse exported state for real speech
+        run: |
+          uv run --project engines/pocket_tts python engines/pocket_tts/runner.py \
+            --language english \
+            --voice outputs/voicepack/states/pocket_tts.safetensors \
+            --text "The exported voice state was loaded again successfully." \
+            --output outputs/generated/reused-state.wav \
+            | tee outputs/reuse.json
+      - name: Verify pack state, hash and PCM output
+        run: |
+          python - <<'PY'
+          import hashlib, json, wave
+          from pathlib import Path
+          root = Path('outputs/voicepack')
+          pack = json.loads((root / 'voicepack.json').read_text())
+          states = pack['backend_states']
+          assert len(states) == 1 and states[0]['engine'] == 'pocket_tts', states
+          state = root / states[0]['path']
+          assert state.exists() and state.stat().st_size > 1000
+          assert hashlib.sha256(state.read_bytes()).hexdigest() == states[0]['sha256']
+          wav_path = Path('outputs/generated/reused-state.wav')
+          with wave.open(str(wav_path), 'rb') as wav:
+              assert wav.getframerate() == 24000
+              assert wav.getnframes() > 1000
+          print(json.dumps({'state_bytes': state.stat().st_size, 'frames': wav.getnframes()}))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pocket-v04-voicepack-state
+          path: outputs/
+          if-no-files-found: error
