@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from .product import PRODUCT_NAME, PRODUCT_TAGLINE, product_manifest
 from .product_contract import GenerationRequest
 from .product_runtime import generate, plan_generation
+from .voice_library import VoiceLibrary
 
 
 class GenerationBody(BaseModel):
@@ -35,9 +36,14 @@ class GenerationBody(BaseModel):
         )
 
 
-def create_app(*, output_root: Path | None = None) -> FastAPI:
+def create_app(
+    *,
+    output_root: Path | None = None,
+    voice_root: Path | None = None,
+) -> FastAPI:
     root = (output_root or Path("outputs/api")).resolve()
     root.mkdir(parents=True, exist_ok=True)
+    voices = VoiceLibrary(voice_root or Path("voices"))
     studio_root = Path(__file__).with_name("studio")
 
     app = FastAPI(
@@ -61,10 +67,15 @@ def create_app(*, output_root: Path | None = None) -> FastAPI:
     def family() -> dict[str, object]:
         return product_manifest()
 
+    @app.get("/v1/voices")
+    def voice_library() -> dict[str, object]:
+        return {"voices": [voice.to_dict() for voice in voices.list()]}
+
     @app.post("/v1/plan")
     def plan(body: GenerationBody) -> dict[str, Any]:
         try:
-            return plan_generation(body.to_request()).to_dict()
+            voicepack_root = voices.resolve(body.voice) if body.voice else None
+            return plan_generation(body.to_request(), voicepack_root=voicepack_root).to_dict()
         except (KeyError, OSError, RuntimeError, ValueError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -74,9 +85,11 @@ def create_app(*, output_root: Path | None = None) -> FastAPI:
         audio_path = root / f"{artifact_id}.wav"
         manifest_path = root / f"{artifact_id}.manifest.json"
         try:
+            voicepack_root = voices.resolve(body.voice) if body.voice else None
             result = generate(
                 body.to_request(),
                 audio_path,
+                voicepack_root=voicepack_root,
                 manifest_path=manifest_path,
             )
         except (KeyError, OSError, RuntimeError, ValueError) as exc:

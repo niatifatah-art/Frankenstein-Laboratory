@@ -21,7 +21,7 @@
       <section class="hero">
         <p class="eyebrow">Make speech, not settings.</p>
         <h1>What should it say?</h1>
-        <p class="subhead">Type a line. Pick the feel. ourTTS handles the engine underneath.</p>
+        <p class="subhead">Type a line. Pick the voice and feel. ourTTS handles the engine underneath.</p>
       </section>
 
       <section class="composer" aria-label="Speech generator">
@@ -35,6 +35,13 @@
         </div>
 
         <div class="controls">
+          <label class="field">
+            <span>Voice</span>
+            <select id="voice">
+              <option value="" selected>Default</option>
+            </select>
+          </label>
+
           <label class="field">
             <span>Language</span>
             <select id="language">
@@ -67,6 +74,8 @@
             </select>
           </label>
         </div>
+
+        <div class="voice-note" id="voice-note">Drop VoicePacks into the local <code>voices/</code> folder and they appear here automatically.</div>
 
         <div class="action-row">
           <div class="hint"><kbd>Ctrl</kbd><span>+</span><kbd>Enter</kbd> to generate</div>

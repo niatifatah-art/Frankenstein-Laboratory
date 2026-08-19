@@ -1,5 +1,7 @@
 (() => {
   const text = document.querySelector('#text');
+  const voice = document.querySelector('#voice');
+  const voiceNote = document.querySelector('#voice-note');
   const language = document.querySelector('#language');
   const quality = document.querySelector('#quality');
   const generateButton = document.querySelector('#generate');
@@ -51,6 +53,13 @@
     audio.removeAttribute('src');
   }
 
+  async function getJson(url) {
+    const response = await fetch(url);
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.detail || `Request failed (${response.status})`);
+    return body;
+  }
+
   async function postJson(url, payload) {
     const response = await fetch(url, {
       method: 'POST',
@@ -58,20 +67,37 @@
       body: JSON.stringify(payload)
     });
     const body = await response.json();
-    if (!response.ok) {
-      throw new Error(body.detail || `Request failed (${response.status})`);
-    }
+    if (!response.ok) throw new Error(body.detail || `Request failed (${response.status})`);
     return body;
   }
 
   function requestPayload() {
     return {
       text: text.value.trim(),
+      voice: voice.value || null,
       language: language.value || null,
       style: selectedStyle,
       quality: quality.value,
       offline: quality.value === 'local'
     };
+  }
+
+  async function loadVoices() {
+    try {
+      const library = await getJson('/v1/voices');
+      const usable = (library.voices || []).filter((item) => item.ready);
+      usable.forEach((item) => {
+        const option = document.createElement('option');
+        option.value = item.voice_id;
+        option.textContent = item.display_name;
+        voice.appendChild(option);
+      });
+      if (usable.length) {
+        voiceNote.textContent = `${usable.length} local VoicePack${usable.length === 1 ? '' : 's'} ready.`;
+      }
+    } catch (error) {
+      voiceNote.textContent = 'Voice library could not be read. Default voice is still available.';
+    }
   }
 
   async function generate() {
@@ -88,10 +114,12 @@
       engine.textContent = plan.engine;
       reason.textContent = (plan.routing_reasons || []).join('; ') || 'Qualified product route';
 
-      if (selectedStyle !== 'natural') {
+      if (payload.voice) {
+        setWorking('Preparing your voice…', `Identity is verified. Route: ${plan.engine}.`);
+      } else if (selectedStyle !== 'natural') {
         setWorking('Generating the expressive take…', `Verified route: ${plan.engine}. Expressive models can take longer on CPU.`);
       } else {
-        setWorking('Generating your voice…', `Verified route selected. The backend stays out of your way.`);
+        setWorking('Generating your voice…', 'Verified route selected. The backend stays out of your way.');
       }
 
       const generated = await postJson('/v1/generate', payload);
@@ -99,7 +127,7 @@
       reason.textContent = (generated.routing_reasons || []).join('; ') || reason.textContent;
       audio.src = `${generated.audio_url}?t=${Date.now()}`;
       audio.load();
-      setDone('Ready to play', 'Generated through the verified ourTTS product path.');
+      setDone('Ready to play', generated.voice_id ? `Voice: ${generated.voice_id}` : 'Generated through the verified ourTTS product path.');
       audio.play().catch(() => {});
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
@@ -132,4 +160,6 @@
       generate();
     }
   });
+
+  loadVoices();
 })();
