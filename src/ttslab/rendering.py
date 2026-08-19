@@ -12,6 +12,7 @@ from .adapter_runtime import (
     adapter_args,
     adapter_supported_controls,
     adapter_supports_reference,
+    adapter_supports_voice_state,
     engine_requires_reference,
 )
 from .audio import inspect_wav
@@ -91,20 +92,36 @@ def _validate_engine_controls(engine: EngineRecord, controls: dict[str, Any]) ->
         )
 
 
-def _validate_reference_path(engine: EngineRecord, reference: Path | None) -> None:
-    if engine_requires_reference(engine.key) and reference is None:
+def _validate_voice_material(
+    engine: EngineRecord,
+    reference: Path | None,
+    voice_state: Path | None,
+) -> None:
+    if reference is not None and voice_state is not None:
+        raise ValueError("Reference audio and prepared voice state are mutually exclusive.")
+    if engine_requires_reference(engine.key) and reference is None and voice_state is None:
         raise ValueError(f"Engine {engine.key!r} requires a reference voice.")
-    if reference is None:
-        return
-    if not engine.supports("voice_cloning"):
-        raise ValueError(
-            f"Engine {engine.key!r} is not qualified for voice cloning; refusing to ignore reference audio."
-        )
-    if not adapter_supports_reference(engine.key):
-        raise ValueError(
-            f"Engine {engine.key!r} advertises cloning upstream, but its current OurTTS adapter "
-            "does not consume reference audio yet."
-        )
+    if reference is not None:
+        if not engine.supports("voice_cloning"):
+            raise ValueError(
+                f"Engine {engine.key!r} is not qualified for voice cloning; "
+                "refusing to ignore reference audio."
+            )
+        if not adapter_supports_reference(engine.key):
+            raise ValueError(
+                f"Engine {engine.key!r} advertises cloning upstream, but its current OurTTS adapter "
+                "does not consume reference audio yet."
+            )
+    if voice_state is not None:
+        if not engine.supports("voice_cloning"):
+            raise ValueError(
+                f"Engine {engine.key!r} is not qualified for voice identity conditioning; "
+                "refusing to ignore prepared state."
+            )
+        if not adapter_supports_voice_state(engine.key):
+            raise ValueError(
+                f"Engine {engine.key!r} has no verified prepared-state adapter mapping."
+            )
 
 
 def choose_render_engine(
@@ -114,15 +131,18 @@ def choose_render_engine(
     reference: Path | None,
     max_generation_rtf: float | None,
     controls: dict[str, Any] | None = None,
+    voice_state: Path | None = None,
 ) -> EngineRecord:
     requested_controls = dict(controls or {})
     if "pause" in requested_controls:
         raise ValueError(
             "Global pause control is ambiguous during rendering; use inline [[pause:320ms]] markers."
         )
+    if reference is not None and voice_state is not None:
+        raise ValueError("Reference audio and prepared voice state are mutually exclusive.")
 
     required_capabilities = set(required_capabilities_for_controls(requested_controls))
-    if reference is not None:
+    if reference is not None or voice_state is not None:
         required_capabilities.add("voice_cloning")
 
     if explicit_engine:
@@ -131,7 +151,7 @@ def choose_render_engine(
             raise ValueError(f"Engine {explicit_engine!r} is not a qualified runnable TTS backend.")
         if not engine.supports_language(language):
             raise ValueError(f"Engine {explicit_engine!r} does not support language {language!r}.")
-        _validate_reference_path(engine, reference)
+        _validate_voice_material(engine, reference, voice_state)
         _validate_engine_controls(engine, requested_controls)
         return engine
 
@@ -145,12 +165,12 @@ def choose_render_engine(
     for candidate in candidates:
         engine = candidate.engine
         try:
-            _validate_reference_path(engine, reference)
+            _validate_voice_material(engine, reference, voice_state)
             _validate_engine_controls(engine, requested_controls)
         except ValueError:
             continue
         return engine
-    if reference is not None or requested_controls:
+    if reference is not None or voice_state is not None or requested_controls:
         raise ValueError(
             "No qualified TTS backend has both the requested capabilities and verified OurTTS "
             "adapter mappings for the requested voice/control inputs."
@@ -166,6 +186,7 @@ def render_text(
     engine_key: str | None = None,
     voice: str | None = None,
     reference: Path | None = None,
+    voice_state: Path | None = None,
     controls: dict[str, Any] | None = None,
     lexicon: PronunciationLexicon | None = None,
     max_generation_rtf: float | None = None,
@@ -181,6 +202,7 @@ def render_text(
         language=language,
         explicit_engine=engine_key,
         reference=reference,
+        voice_state=voice_state,
         max_generation_rtf=max_generation_rtf,
         controls=requested_controls,
     )
@@ -190,6 +212,7 @@ def render_text(
             language=language,
             voice=voice,
             reference=reference,
+            voice_state=voice_state,
             controls=requested_controls,
         ),
     )
@@ -265,13 +288,14 @@ def render_text(
                 retained_parts.append(str(destination))
 
     manifest: dict[str, Any] = {
-        "schema_version": 2,
+        "schema_version": 3,
         "engine": engine.key,
         "source_text": text,
         "clean_text": script.clean_text,
         "language": language,
         "voice": voice,
         "reference": str(reference.resolve()) if reference else None,
+        "voice_state": str(voice_state.resolve()) if voice_state else None,
         "controls": requested_controls,
         "leading_silence_ms": script.leading_silence_ms,
         "segments": executions,
@@ -281,5 +305,8 @@ def render_text(
         "metadata": dict(manifest_metadata or {}),
     }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return manifest
