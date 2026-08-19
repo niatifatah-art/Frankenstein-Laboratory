@@ -1,3 +1,9 @@
+"""Product-facing routing and generation boundary for ourTTS.
+
+This layer keeps the public request simple while preserving the laboratory's capability,
+performance, VoicePack, and provenance truth rules underneath.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
