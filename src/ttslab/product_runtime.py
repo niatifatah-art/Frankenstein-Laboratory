@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .adapter_runtime import adapter_supports_voice_state
+from .adapter_runtime import adapter_supports_voice_state, adapter_voice_state_format
 from .pipeline import required_capabilities_for_controls
 from .product import PRODUCT_NAME
 from .product_contract import GenerationRequest, ResolvedGeneration
@@ -212,7 +212,14 @@ def _prepared_state_for_engine(
 ) -> tuple[Path | None, dict[str, Any]]:
     if voice.pack is None or voice.root is None:
         return None, {"status": "not_requested"}
-    selection = voice.pack.resolve_backend_state(voice.root, engine.key, verify_hash=True)
+    try:
+        selection = voice.pack.resolve_backend_state(voice.root, engine.key, verify_hash=True)
+    except ValueError as exc:
+        return None, {
+            "status": "invalid_state",
+            "engine": engine.key,
+            "reason": str(exc),
+        }
     if selection is None:
         return None, {"status": "not_prepared", "engine": engine.key}
     state = selection.state
@@ -226,8 +233,16 @@ def _prepared_state_for_engine(
         "adapter_version": state.adapter_version,
         "source_reference_sha256": state.source_reference_sha256,
     }
+    if not engine.supports("voice_cache"):
+        summary["status"] = "voice_cache_not_qualified"
+        return None, summary
     if not adapter_supports_voice_state(engine.key):
         summary["status"] = "adapter_not_supported"
+        return None, summary
+    expected_format = adapter_voice_state_format(engine.key)
+    if state.format != expected_format:
+        summary["status"] = "unsupported_state_format"
+        summary["expected_format"] = expected_format
         return None, summary
     if state.model_revision and engine.source_revision and state.model_revision != engine.source_revision:
         summary["status"] = "stale_model_revision"
