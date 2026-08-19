@@ -79,8 +79,14 @@ def build_worker_command(
     text: str | None = None,
     output: Path | None = None,
     describe: bool = False,
+    prepare_voice: bool = False,
+    reference: Path | None = None,
+    state_output: Path | None = None,
     extra_args: list[str] | None = None,
 ) -> tuple[str, ...]:
+    if describe and prepare_voice:
+        raise ValueError("Worker command cannot describe and prepare a voice in the same operation.")
+
     worker = get_worker(key)
     command = [
         _uv(),
@@ -93,6 +99,18 @@ def build_worker_command(
     ]
     if describe:
         command.append("--describe")
+    elif prepare_voice:
+        if reference is None or state_output is None:
+            raise ValueError("reference and state_output are required for voice preparation")
+        command.extend(
+            [
+                "--prepare-voice",
+                "--reference",
+                str(reference),
+                "--state-output",
+                str(state_output),
+            ]
+        )
     else:
         if text is None or output is None:
             raise ValueError("text and output are required for synthesis")
@@ -122,6 +140,9 @@ def execute_worker(
     text: str | None = None,
     output: Path | None = None,
     describe: bool = False,
+    prepare_voice: bool = False,
+    reference: Path | None = None,
+    state_output: Path | None = None,
     extra_args: list[str] | None = None,
     timeout_seconds: float | None = None,
 ) -> WorkerExecution:
@@ -130,6 +151,9 @@ def execute_worker(
         text=text,
         output=output,
         describe=describe,
+        prepare_voice=prepare_voice,
+        reference=reference,
+        state_output=state_output,
         extra_args=extra_args,
     )
     completed = subprocess.run(
