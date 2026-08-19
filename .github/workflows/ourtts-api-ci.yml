@@ -1,0 +1,41 @@
+name: ourtts-api-ci
+
+on:
+  pull_request:
+    paths:
+      - "src/ttslab/product_api.py"
+      - "src/ttslab/product_contract.py"
+      - "src/ttslab/product_runtime.py"
+      - "src/ttslab/product.py"
+      - "tests_api/**"
+      - "pyproject.toml"
+      - ".github/workflows/ourtts-api-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  api-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install API extra
+        run: python -m pip install -e ".[dev,api]"
+      - name: Ruff API slice
+        run: ruff check src/ttslab/product_api.py tests_api
+      - name: API contract tests
+        run: pytest -q tests_api
+      - name: OpenAPI smoke
+        run: |
+          python - <<'PY'
+          from ttslab.product_api import create_app
+          app = create_app()
+          schema = app.openapi()
+          assert schema["info"]["title"] == "ourTTS"
+          assert "/v1/generate" in schema["paths"]
+          assert "/v1/plan" in schema["paths"]
+          PY
