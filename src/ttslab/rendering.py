@@ -7,10 +7,16 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from .adapter_runtime import RuntimeInputs, adapter_args, engine_requires_reference
+from .adapter_runtime import (
+    RuntimeInputs,
+    adapter_args,
+    adapter_supported_controls,
+    engine_requires_reference,
+)
 from .audio import inspect_wav
 from .audio_timeline import AudioPart, concatenate_pcm_wavs
 from .isolation import execute_worker
+from .pipeline import required_capabilities_for_controls
 from .pronunciation import PronunciationLexicon
 from .prosody import parse_control_markup
 from .registry import EngineRecord, get_engine
@@ -63,13 +69,41 @@ def parse_render_script(text: str) -> RenderScript:
     return RenderScript(clean_text=clean, leading_silence_ms=leading_silence_ms, chunks=tuple(chunks))
 
 
+def _validate_engine_controls(engine: EngineRecord, controls: dict[str, Any]) -> None:
+    if "pause" in controls:
+        raise ValueError(
+            "Global pause control is ambiguous during rendering; use inline [[pause:320ms]] markers."
+        )
+    required = required_capabilities_for_controls(controls)
+    missing_capabilities = sorted(capability for capability in required if not engine.supports(capability))
+    if missing_capabilities:
+        raise ValueError(
+            f"Engine {engine.key!r} does not advertise required capabilities: "
+            f"{', '.join(missing_capabilities)}"
+        )
+    adapter_controls = adapter_supported_controls(engine.key)
+    missing_adapter_mappings = sorted(set(controls) - set(adapter_controls))
+    if missing_adapter_mappings:
+        raise ValueError(
+            f"Engine {engine.key!r} may expose upstream controls, but its OurTTS adapter does not "
+            f"translate these normalized controls yet: {', '.join(missing_adapter_mappings)}"
+        )
+
+
 def choose_render_engine(
     *,
     language: str | None,
     explicit_engine: str | None,
     reference: Path | None,
     max_generation_rtf: float | None,
+    controls: dict[str, Any] | None = None,
 ) -> EngineRecord:
+    requested_controls = dict(controls or {})
+    if "pause" in requested_controls:
+        raise ValueError(
+            "Global pause control is ambiguous during rendering; use inline [[pause:320ms]] markers."
+        )
+
     if explicit_engine:
         engine = get_engine(explicit_engine)
         if not engine.runnable or engine.kind != "tts":
@@ -78,14 +112,30 @@ def choose_render_engine(
             raise ValueError(f"Engine {explicit_engine!r} does not support language {language!r}.")
         if engine_requires_reference(engine.key) and reference is None:
             raise ValueError(f"Engine {explicit_engine!r} requires a reference voice.")
+        _validate_engine_controls(engine, requested_controls)
         return engine
 
     candidates = route_engines(
-        RouteRequest(language=language, max_generation_rtf=max_generation_rtf)
+        RouteRequest(
+            language=language,
+            require=required_capabilities_for_controls(requested_controls),
+            max_generation_rtf=max_generation_rtf,
+        )
     )
     for candidate in candidates:
-        if not engine_requires_reference(candidate.engine.key) or reference is not None:
-            return candidate.engine
+        engine = candidate.engine
+        if engine_requires_reference(engine.key) and reference is None:
+            continue
+        try:
+            _validate_engine_controls(engine, requested_controls)
+        except ValueError:
+            continue
+        return engine
+    if requested_controls:
+        raise ValueError(
+            "No qualified TTS backend has both the requested capabilities and a verified OurTTS "
+            "adapter mapping for all requested controls."
+        )
     raise ValueError("No qualified TTS backend satisfies the rendering request.")
 
 
@@ -97,23 +147,32 @@ def render_text(
     engine_key: str | None = None,
     voice: str | None = None,
     reference: Path | None = None,
+    controls: dict[str, Any] | None = None,
     lexicon: PronunciationLexicon | None = None,
     max_generation_rtf: float | None = None,
     engine_args: list[str] | None = None,
     manifest_path: Path | None = None,
+    manifest_metadata: dict[str, Any] | None = None,
     keep_parts: bool = False,
     timeout_seconds: float = 1800.0,
 ) -> dict[str, Any]:
+    requested_controls = dict(controls or {})
     script = parse_render_script(text)
     engine = choose_render_engine(
         language=language,
         explicit_engine=engine_key,
         reference=reference,
         max_generation_rtf=max_generation_rtf,
+        controls=requested_controls,
     )
     runtime_args = adapter_args(
         engine.key,
-        RuntimeInputs(language=language, voice=voice, reference=reference),
+        RuntimeInputs(
+            language=language,
+            voice=voice,
+            reference=reference,
+            controls=requested_controls,
+        ),
     )
     runtime_args.extend(engine_args or [])
 
@@ -187,18 +246,20 @@ def render_text(
                 retained_parts.append(str(destination))
 
     manifest: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "engine": engine.key,
         "source_text": text,
         "clean_text": script.clean_text,
         "language": language,
         "voice": voice,
         "reference": str(reference.resolve()) if reference else None,
+        "controls": requested_controls,
         "leading_silence_ms": script.leading_silence_ms,
         "segments": executions,
         "final_audio": asdict(final_info),
         "retained_parts": retained_parts,
         "adapter_args": runtime_args,
+        "metadata": dict(manifest_metadata or {}),
     }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
