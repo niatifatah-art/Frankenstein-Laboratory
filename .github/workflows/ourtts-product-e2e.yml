@@ -4,9 +4,11 @@ on:
   pull_request:
     paths:
       - "src/ttslab/product*.py"
+      - "src/ttslab/quality.py"
       - "src/ttslab/rendering.py"
       - "src/ttslab/router.py"
       - "src/ttslab/adapter_runtime.py"
+      - "benchmarks/quality/**"
       - "registry/**"
       - "engines/pocket_tts/**"
       - ".github/workflows/ourtts-product-e2e.yml"
@@ -47,6 +49,19 @@ jobs:
           assert plan["request"]["quality"] == "auto"
           assert plan["controls"] == {}
           PY
+      - name: Verify Best stays evidence-gated
+        run: |
+          python - <<'PY'
+          from ttslab.product_contract import GenerationRequest
+          from ttslab.product_runtime import plan_generation
+
+          try:
+              plan_generation(GenerationRequest(text="Hello", language="en", quality="best"))
+          except ValueError as exc:
+              assert "No release-quality evidence" in str(exc), exc
+          else:
+              raise AssertionError("Best must not activate before measured quality evidence exists")
+          PY
       - name: Generate through ourTTS product command
         run: |
           ourtts generate \
@@ -74,6 +89,7 @@ jobs:
           assert manifest["metadata"]["product"]["name"] == "ourTTS"
           assert manifest["metadata"]["product"]["request"]["quality"] == "auto"
           assert manifest["metadata"]["product"]["routing"]["engine"] == "pocket_tts"
+          assert manifest["metadata"]["product"]["routing"]["quality_evidence"] is None
 
           with wave.open(str(root / "hello.wav"), "rb") as wav:
               assert wav.getnframes() > 1000
