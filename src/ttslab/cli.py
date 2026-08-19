@@ -210,6 +210,7 @@ def _cmd_voicepack_check(args: argparse.Namespace) -> int:
         "display_name": pack.display_name,
         "references": len(pack.references),
         "backend_states": len(pack.backend_states),
+        "style_presets": sorted(pack.style_presets),
         "errors": list(errors),
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -268,23 +269,85 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _voicepack_render_inputs(
+    args: argparse.Namespace,
+) -> tuple[Path | None, str | None, PronunciationLexicon | None, dict[str, object], dict[str, object]]:
+    controls = _parse_controls(args.control)
+    if args.voicepack is None:
+        return args.reference, args.language, _load_lexicon(args.lexicon), controls, {}
+
+    if args.reference is not None:
+        raise ValueError("--reference and --voicepack are mutually exclusive.")
+
+    root = args.voicepack.resolve()
+    pack = VoicePack.load(root)
+    pack_controls = pack.style_controls(args.style_preset)
+    pack_controls.update(controls)
+
+    if pack.references:
+        selection = pack.select_reference(
+            root,
+            allow_unknown_consent=args.allow_unknown_voice_consent,
+            verify_hash=True,
+        )
+    elif pack.backend_states:
+        raise ValueError(
+            f"VoicePack {pack.voice_id!r} contains cached backend state but no reference clip. "
+            "Backend-state execution is deliberately not integrated yet, so refusing to fake it."
+        )
+    else:
+        raise ValueError(
+            f"VoicePack {pack.voice_id!r} contains no executable identity material. "
+            "Add a consented/provenanced reference clip or a future supported backend state."
+        )
+
+    language = args.language
+    if language is None and len(pack.languages) == 1:
+        language = pack.languages[0]
+
+    lexicon_path = args.lexicon
+    if lexicon_path is None and pack.pronunciation_lexicon:
+        lexicon_path = root / pack.pronunciation_lexicon
+
+    metadata: dict[str, object] = {
+        "voicepack": {
+            "voice_id": pack.voice_id,
+            "display_name": pack.display_name,
+            "style_preset": args.style_preset,
+            "reference": {
+                "path": selection.clip.path,
+                "sha256": selection.clip.sha256,
+                "license": selection.clip.license,
+                "source": selection.clip.source,
+                "consent": selection.clip.consent,
+            },
+            "provenance": pack.provenance,
+            "unknown_consent_explicitly_allowed": bool(args.allow_unknown_voice_consent),
+        }
+    }
+    return selection.path, language, _load_lexicon(lexicon_path), pack_controls, metadata
+
+
 def _cmd_synthesize(args: argparse.Namespace) -> int:
     try:
+        reference, language, lexicon, controls, metadata = _voicepack_render_inputs(args)
         manifest = render_text(
             args.text,
             args.output,
-            language=args.language,
+            language=language,
             engine_key=args.engine,
             voice=args.voice,
-            reference=args.reference,
-            lexicon=_load_lexicon(args.lexicon),
+            reference=reference,
+            controls=controls,
+            lexicon=lexicon,
             max_generation_rtf=args.max_generation_rtf,
             engine_args=args.engine_arg,
             manifest_path=args.manifest,
+            manifest_metadata=metadata,
             keep_parts=args.keep_parts,
             timeout_seconds=args.timeout,
         )
-    except (KeyError, RuntimeError, ValueError) as exc:
+    except (KeyError, RuntimeError, ValueError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 5
     print(json.dumps(manifest, ensure_ascii=False))
@@ -389,7 +452,11 @@ def build_parser() -> argparse.ArgumentParser:
     synth_parser.add_argument("--engine")
     synth_parser.add_argument("--voice")
     synth_parser.add_argument("--reference", type=Path)
+    synth_parser.add_argument("--voicepack", type=Path)
+    synth_parser.add_argument("--style-preset")
+    synth_parser.add_argument("--allow-unknown-voice-consent", action="store_true")
     synth_parser.add_argument("--lexicon", type=Path)
+    synth_parser.add_argument("--control", action="append", default=[])
     synth_parser.add_argument("--max-generation-rtf", type=float)
     synth_parser.add_argument("--manifest", type=Path)
     synth_parser.add_argument("--keep-parts", action="store_true")

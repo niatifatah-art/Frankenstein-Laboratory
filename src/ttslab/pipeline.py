@@ -11,6 +11,11 @@ from .text_engine import PreparedText, prepare_text
 _CONTROL_CAPABILITY = {
     "style": "style_control",
     "emotion": "emotion_control",
+    "pace": "pace_control",
+    "pitch": "pitch_control",
+    "volume": "volume_control",
+    "emphasis": "emphasis_control",
+    "whisper": "whisper_control",
     "phoneme": "phoneme_override",
     "voice_design": "voice_design",
     "nonverbal": "paralinguistic_tags",
@@ -33,6 +38,19 @@ class SynthesisPlan:
     requested_controls: dict[str, Any]
 
 
+def required_capabilities_for_controls(controls: dict[str, Any] | None) -> tuple[str, ...]:
+    requested = controls or {}
+    return tuple(
+        sorted(
+            {
+                capability
+                for key, capability in _CONTROL_CAPABILITY.items()
+                if key in requested and key not in _CORE_POSTPROCESS
+            }
+        )
+    )
+
+
 def build_synthesis_plan(
     text: str,
     *,
@@ -43,11 +61,7 @@ def build_synthesis_plan(
     max_generation_rtf: float | None = None,
 ) -> SynthesisPlan:
     requested = dict(controls or {})
-    required_capabilities = tuple(
-        capability
-        for key, capability in _CONTROL_CAPABILITY.items()
-        if key in requested and key not in _CORE_POSTPROCESS
-    )
+    required_capabilities = required_capabilities_for_controls(requested)
 
     if explicit_engine:
         engine = get_engine(explicit_engine)

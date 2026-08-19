@@ -63,12 +63,57 @@ def test_owned_renderer_selects_backend_preprocesses_and_inserts_exact_silence(
     assert manifest["engine"] == "pocket_tts"
     assert calls[0][1] == "dev shelf speaks."
     assert calls[0][2] == ("--language", "english")
+    assert manifest["schema_version"] == 2
     assert manifest["leading_silence_ms"] == 50
     assert manifest["segments"][0]["pause_after_ms"] == 250
     assert manifest["final_audio"]["frames"] == 50 + 100 + 250 + 100
     assert output.exists()
     saved = json.loads(output.with_suffix(".wav.manifest.json").read_text())
     assert saved["final_audio"]["sha256"] == manifest["final_audio"]["sha256"]
+
+
+def test_reference_requires_a_real_cloning_adapter(tmp_path: Path, monkeypatch) -> None:
+    def should_not_run(*args, **kwargs):
+        raise AssertionError("worker must not run when reference audio would be ignored")
+
+    monkeypatch.setattr("ttslab.rendering.execute_worker", should_not_run)
+    reference = tmp_path / "voice.wav"
+    reference.write_bytes(b"reference")
+    with pytest.raises(ValueError, match="does not consume reference audio"):
+        render_text(
+            "hello",
+            tmp_path / "never.wav",
+            language="en",
+            engine_key="pocket_tts",
+            reference=reference,
+        )
+
+
+def test_verified_normalized_style_control_reaches_worker(tmp_path: Path, monkeypatch) -> None:
+    calls = []
+
+    def fake_execute(key, *, text, output, extra_args, timeout_seconds):
+        calls.append((key, text, tuple(extra_args)))
+        _write_pcm(output)
+        return WorkerExecution(
+            command=("fake",),
+            returncode=0,
+            stdout='{"ok": true}',
+            stderr="",
+            payload={"ok": True},
+        )
+
+    monkeypatch.setattr("ttslab.rendering.execute_worker", fake_execute)
+    manifest = render_text(
+        "hello",
+        tmp_path / "styled.wav",
+        language="en",
+        engine_key="qwen3_custom_06b",
+        controls={"style": "warm narrator"},
+    )
+    assert calls[0][0] == "qwen3_custom_06b"
+    assert calls[0][2] == ("--language", "English", "--instruct", "warm narrator")
+    assert manifest["controls"] == {"style": "warm narrator"}
 
 
 def test_mixed_phoneme_override_is_refused_until_adapter_support_is_real(

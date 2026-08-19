@@ -1,0 +1,115 @@
+name: ourtts-v05-voicepack-e2e
+
+on:
+  pull_request:
+    paths:
+      - "src/ttslab/voicepack.py"
+      - "src/ttslab/adapter_runtime.py"
+      - "src/ttslab/rendering.py"
+      - "src/ttslab/cli.py"
+      - "engines/chatterbox/**"
+      - ".github/workflows/ourtts-v05-voicepack-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  voicepack-clone:
+    name: VoicePack -> OurTTS -> Chatterbox Nano
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install core tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng
+          python -m pip install --upgrade uv
+          python -m pip install -e ".[dev]"
+      - name: Create controlled synthetic reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/voicepack/refs
+          uv run --project engines/kokoro python engines/kokoro/runner.py \
+            --voice bm_fable --language b \
+            --text "This is a synthetic reference voice created inside Frankenstein Laboratory for a controlled cloning test." \
+            --output outputs/voicepack/refs/reference.wav \
+            > outputs/voicepack/reference-generation.json
+      - name: Build provenance-aware VoicePack
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("outputs/voicepack")
+          ref = root / "refs/reference.wav"
+          digest = hashlib.sha256(ref.read_bytes()).hexdigest()
+          payload = {
+              "schema_version": 1,
+              "voice_id": "lab_synthetic_fable",
+              "display_name": "Lab Synthetic Fable",
+              "languages": ["en"],
+              "references": [{
+                  "path": "refs/reference.wav",
+                  "sha256": digest,
+                  "license": "generated-in-lab",
+                  "source": "Kokoro bm_fable synthetic test reference",
+                  "consent": "synthetic",
+              }],
+              "backend_states": [],
+              "style_presets": {},
+              "provenance": {
+                  "synthetic": True,
+                  "purpose": "OurTTS v0.5 VoicePack E2E",
+              },
+          }
+          (root / "voicepack.json").write_text(json.dumps(payload, indent=2) + "\n")
+          PY
+          python -m ttslab voicepack-check outputs/voicepack
+      - name: Render through owned VoicePack path
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m ttslab synthesize \
+            --text "Frankenstein Laboratory can now resolve this synthetic VoicePack identity through the owned rendering path." \
+            --output outputs/voicepack/rendered.wav \
+            --voicepack outputs/voicepack \
+            --engine chatterbox_nano \
+            --manifest outputs/voicepack/rendered.manifest.json \
+            --timeout 1800 \
+            > outputs/voicepack/render-command.json
+      - name: Validate identity evidence
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import wave
+          from pathlib import Path
+
+          root = Path("outputs/voicepack")
+          manifest = json.loads((root / "rendered.manifest.json").read_text())
+          assert manifest["schema_version"] == 2
+          assert manifest["engine"] == "chatterbox_nano"
+          assert manifest["metadata"]["voicepack"]["voice_id"] == "lab_synthetic_fable"
+          assert manifest["metadata"]["voicepack"]["reference"]["consent"] == "synthetic"
+          assert "--reference" in manifest["adapter_args"]
+          assert manifest["segments"][0]["worker_payload"]["reference"]
+          audio = root / "rendered.wav"
+          with wave.open(str(audio), "rb") as wav:
+              assert wav.getnframes() > 0
+              assert wav.getnchannels() == 1
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ourtts-v05-voicepack-e2e
+          path: outputs/voicepack/
+          if-no-files-found: error
+          retention-days: 14

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 _ALLOWED_CONSENT = {"owned", "licensed", "consented", "synthetic", "unknown"}
+_USABLE_REFERENCE_CONSENT = {"owned", "licensed", "consented", "synthetic"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +38,17 @@ class BackendVoiceState:
 
     def __post_init__(self) -> None:
         _validate_relative_path(self.path)
+        if self.sha256 and (
+            len(self.sha256) != 64
+            or any(c not in "0123456789abcdef" for c in self.sha256.lower())
+        ):
+            raise ValueError("Backend state sha256 must be a 64-character hex digest.")
+
+
+@dataclass(frozen=True, slots=True)
+class VoiceReferenceSelection:
+    clip: ReferenceClip
+    path: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +70,11 @@ class VoicePack:
             raise ValueError("voice_id must be a non-empty whitespace-free identifier.")
         if self.pronunciation_lexicon:
             _validate_relative_path(self.pronunciation_lexicon)
+        for name, controls in self.style_presets.items():
+            if not name.strip():
+                raise ValueError("VoicePack style preset names must not be empty.")
+            if not isinstance(controls, dict):
+                raise TypeError(f"VoicePack style preset {name!r} must contain a control mapping.")
 
     @classmethod
     def load(cls, root: Path) -> VoicePack:
@@ -108,6 +125,60 @@ class VoicePack:
         if self.pronunciation_lexicon and not (root / self.pronunciation_lexicon).exists():
             errors.append(f"missing pronunciation lexicon: {self.pronunciation_lexicon}")
         return tuple(errors)
+
+    def select_reference(
+        self,
+        root: Path,
+        *,
+        allow_unknown_consent: bool = False,
+        verify_hash: bool = True,
+    ) -> VoiceReferenceSelection:
+        """Resolve one usable reference without silently weakening consent/provenance policy."""
+        root = root.resolve()
+        eligible = set(_USABLE_REFERENCE_CONSENT)
+        if allow_unknown_consent:
+            eligible.add("unknown")
+
+        failures: list[str] = []
+        for clip in self.references:
+            if clip.consent not in eligible:
+                failures.append(f"{clip.path}: consent={clip.consent}")
+                continue
+            path = (root / clip.path).resolve()
+            if not path.is_relative_to(root):
+                failures.append(f"{clip.path}: path escapes VoicePack root")
+                continue
+            if not path.is_file():
+                failures.append(f"{clip.path}: missing file")
+                continue
+            if verify_hash and clip.sha256 and _sha256(path) != clip.sha256.lower():
+                failures.append(f"{clip.path}: sha256 mismatch")
+                continue
+            return VoiceReferenceSelection(clip=clip, path=path)
+
+        if not self.references:
+            raise ValueError(f"VoicePack {self.voice_id!r} contains no reference clips.")
+        detail = "; ".join(failures) if failures else "no eligible reference"
+        raise ValueError(f"VoicePack {self.voice_id!r} has no usable reference clip: {detail}")
+
+    def style_controls(self, name: str | None) -> dict[str, Any]:
+        if name is None:
+            return {}
+        try:
+            controls = self.style_presets[name]
+        except KeyError as exc:
+            available = ", ".join(sorted(self.style_presets)) or "none"
+            raise ValueError(
+                f"Unknown style preset {name!r} for VoicePack {self.voice_id!r}; "
+                f"available: {available}"
+            ) from exc
+        return dict(controls)
+
+    def backend_state(self, engine: str) -> BackendVoiceState | None:
+        for state in self.backend_states:
+            if state.engine == engine:
+                return state
+        return None
 
 
 def _validate_relative_path(value: str) -> None:
