@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .product import PRODUCT_NAME, PRODUCT_TAGLINE, product_manifest
@@ -37,12 +38,20 @@ class GenerationBody(BaseModel):
 def create_app(*, output_root: Path | None = None) -> FastAPI:
     root = (output_root or Path("outputs/api")).resolve()
     root.mkdir(parents=True, exist_ok=True)
+    studio_root = Path(__file__).with_name("studio")
 
     app = FastAPI(
         title=PRODUCT_NAME,
         version="0.6-dev",
         description=PRODUCT_TAGLINE,
     )
+
+    if studio_root.is_dir():
+        app.mount("/studio-assets", StaticFiles(directory=studio_root), name="studio-assets")
+
+        @app.get("/", include_in_schema=False)
+        def studio() -> FileResponse:
+            return FileResponse(studio_root / "index.html", media_type="text/html")
 
     @app.get("/health")
     def health() -> dict[str, str]:
