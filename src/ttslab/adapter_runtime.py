@@ -76,14 +76,12 @@ _REFERENCE_SUPPORT = frozenset(
     }
 )
 
-_VOICE_STATE_SUPPORT = frozenset(
-    {
-        "chatterbox_base",
-        "chatterbox_nano",
-        "chatterbox_turbo",
-        "chatterbox_v3",
-    }
-)
+_VOICE_STATE_FORMATS: dict[str, str] = {
+    "chatterbox_base": "chatterbox-conditionals-pt-v1",
+    "chatterbox_nano": "chatterbox-conditionals-pt-v1",
+    "chatterbox_turbo": "chatterbox-conditionals-pt-v1",
+    "chatterbox_v3": "chatterbox-conditionals-pt-v1",
+}
 
 
 def adapter_supported_controls(engine_key: str) -> frozenset[str]:
@@ -96,9 +94,14 @@ def adapter_supports_reference(engine_key: str) -> bool:
     return engine_key in _REFERENCE_SUPPORT
 
 
+def adapter_voice_state_format(engine_key: str) -> str | None:
+    """Return the exact prepared-state format the adapter can execute, if any."""
+    return _VOICE_STATE_FORMATS.get(engine_key)
+
+
 def adapter_supports_voice_state(engine_key: str) -> bool:
     """Return whether the adapter executes a backend-specific prepared VoicePack state."""
-    return engine_key in _VOICE_STATE_SUPPORT
+    return adapter_voice_state_format(engine_key) is not None
 
 
 def adapter_args(engine_key: str, inputs: RuntimeInputs) -> list[str]:
