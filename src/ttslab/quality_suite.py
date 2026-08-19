@@ -3,10 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 import unicodedata
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from statistics import fmean
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from .benchmark import BenchmarkCase, load_corpus
 from .quality import QualityEvidence
@@ -62,7 +63,7 @@ class QualitySample:
             raise ValueError("quality sample evidence_ref must not be empty")
 
     @classmethod
-    def from_dict(cls, raw: dict[str, Any]) -> "QualitySample":
+    def from_dict(cls, raw: dict[str, Any]) -> QualitySample:
         return cls(
             engine=str(raw["engine"]),
             case_key=str(raw["case_key"]),
@@ -116,7 +117,7 @@ class ListeningRating:
             raise ValueError("naturalness_mos must be between 1 and 5")
 
     @classmethod
-    def from_dict(cls, raw: dict[str, Any]) -> "ListeningRating":
+    def from_dict(cls, raw: dict[str, Any]) -> ListeningRating:
         return cls(blind_id=str(raw["blind_id"]), naturalness_mos=float(raw["naturalness_mos"]))
 
 
@@ -337,7 +338,7 @@ def build_release_evidence(
         seen_blind_ids.add(rating.blind_id)
         identity = private.get(rating.blind_id)
         if not isinstance(identity, dict):
-            raise ValueError(f"rating {rating.blind_id!r} has no private engine mapping")
+            raise TypeError(f"rating {rating.blind_id!r} has no private engine mapping")
         key = (str(identity["engine"]), str(identity["case_key"]))
         sample = sample_by_identity.get(key)
         if sample is None:
@@ -372,7 +373,7 @@ def load_samples(path: Path) -> tuple[QualitySample, ...]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     items = raw.get("samples", raw) if isinstance(raw, dict) else raw
     if not isinstance(items, list):
-        raise ValueError("quality samples JSON must contain a list or a {samples: [...]} object")
+        raise TypeError("quality samples JSON must contain a list or a {samples: [...]} object")
     return tuple(QualitySample.from_dict(item) for item in items)
 
 
@@ -380,11 +381,14 @@ def load_ratings(path: Path) -> tuple[ListeningRating, ...]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     items = raw.get("ratings", raw.get("samples", raw)) if isinstance(raw, dict) else raw
     if not isinstance(items, list):
-        raise ValueError("ratings JSON must contain a list")
+        raise TypeError("ratings JSON must contain a list")
     normalized: list[ListeningRating] = []
     for item in items:
         if "naturalness_mos" not in item and isinstance(item.get("rating"), dict):
-            item = {"blind_id": item["blind_id"], "naturalness_mos": item["rating"].get("naturalness_mos")}
+            item = {
+                "blind_id": item["blind_id"],
+                "naturalness_mos": item["rating"].get("naturalness_mos"),
+            }
         if item.get("naturalness_mos") is None:
             continue
         normalized.append(ListeningRating.from_dict(item))
