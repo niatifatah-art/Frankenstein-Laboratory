@@ -102,7 +102,7 @@ def test_best_mode_is_truthfully_refused_without_quality_evidence(tmp_path: Path
         json={"text": "Hello", "language": "en", "quality": "best"},
     )
     assert response.status_code == 422
-    assert "common quality benchmark" in response.json()["detail"]
+    assert "No release-quality evidence" in response.json()["detail"]
 
 
 def test_generate_returns_safe_artifact_urls(monkeypatch, tmp_path: Path) -> None:
