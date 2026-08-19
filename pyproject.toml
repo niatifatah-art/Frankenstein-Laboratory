@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "frankenstein-tts-lab"
-version = "0.3.0"
-description = "A reproducible laboratory for evaluating and integrating open-source TTS systems."
+version = "0.8.0"
+description = "ourTTS product core plus the Frankenstein Laboratory for reproducible TTS qualification."
 requires-python = ">=3.11"
 dependencies = []
 
@@ -19,8 +19,8 @@ api = [
 ]
 
 [project.scripts]
-ttslab = "ttslab.cli:main"
-ourtts = "ttslab.product_cli:main"
+ttslab = "ttslab.entrypoints:lab_main"
+ourtts = "ttslab.entrypoints:product_main"
 ourtts-api = "ttslab.product_api:main"
 
 [tool.setuptools]

@@ -1,0 +1,108 @@
+name: windows-native-ci
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "engines/pocket_tts/**"
+      - "tests/**"
+      - "tests_api/**"
+      - "pyproject.toml"
+      - "install-windows.ps1"
+      - "start-ourtts-studio.cmd"
+      - "docs/platforms/windows.md"
+      - ".github/workflows/windows-native-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-core-and-real-product:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run the documented native Windows installer
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\install-windows.ps1 -Dev
+
+      - name: Core lint and tests through the installed venv
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\ruff.exe check .
+          .\.venv\Scripts\pytest.exe -q
+          .\.venv\Scripts\pytest.exe -q tests_api
+
+      - name: Windows CLI and OpenAPI smoke without venv activation
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\python.exe -m ttslab doctor
+          .\.venv\Scripts\ourtts.exe --json
+          .\.venv\Scripts\ourtts.exe plan --text "Windows native planning works." --language en --quality fast --json
+          @'
+          from ttslab.product_api import create_app
+          app = create_app()
+          schema = app.openapi()
+          assert schema["info"]["title"] == "ourTTS"
+          assert "/v1/generate" in schema["paths"]
+          assert "/v1/plan" in schema["paths"]
+          print("OpenAPI: OK")
+          '@ | .\.venv\Scripts\python.exe -
+
+      - name: Real native Windows generation in a Unicode and spaced path
+        shell: pwsh
+        run: |
+          $OutputDir = Join-Path "outputs" "Windows صوت test"
+          New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
+          $Output = Join-Path $OutputDir "first voice.wav"
+          $Result = Join-Path $OutputDir "windows-result.json"
+          .\.venv\Scripts\ourtts.exe generate `
+            --text "Hello from a real native Windows ourTTS certification run." `
+            --language en `
+            --quality fast `
+            --output $Output `
+            --json | Tee-Object -FilePath $Result
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Validate Windows PCM, manifest, routing and path handling
+        shell: pwsh
+        run: |
+          @'
+          import json
+          import wave
+          from pathlib import Path
+
+          root = Path("outputs") / "Windows صوت test"
+          wav_path = root / "first voice.wav"
+          manifest_path = root / "first voice.wav.manifest.json"
+          result_path = root / "windows-result.json"
+
+          assert wav_path.exists() and wav_path.stat().st_size > 1000
+          assert manifest_path.exists()
+          assert result_path.exists()
+
+          with wave.open(str(wav_path), "rb") as wav:
+              assert wav.getnchannels() == 1
+              assert wav.getframerate() > 0
+              assert wav.getnframes() > 1000
+              audio = {"sample_rate": wav.getframerate(), "frames": wav.getnframes()}
+
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          assert manifest["engine"] == "pocket_tts", manifest["engine"]
+          assert "Windows صوت test" in str(wav_path)
+          print({"engine": manifest["engine"], "windows_native": True, **audio})
+          '@ | .\.venv\Scripts\python.exe -
+
+      - name: Upload native Windows evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ourtts-windows-native
+          path: outputs/
+          if-no-files-found: error

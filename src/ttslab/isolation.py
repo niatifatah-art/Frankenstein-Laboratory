@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -64,13 +65,34 @@ def get_worker(key: str) -> WorkerSpec:
 
 
 def _uv() -> str:
+    """Resolve uv without requiring the caller to activate its virtual environment.
+
+    On Windows it is common to invoke `.venv\\Scripts\\ourtts.exe` directly from Explorer,
+    PowerShell, a `.cmd` launcher, or another application. In that case the venv's Scripts
+    directory is not necessarily on PATH even though `uv.exe` is installed next to the active
+    interpreter. Prefer PATH when available, then fall back to the active interpreter directory.
+    """
     uv = shutil.which("uv")
-    if uv is None:
-        raise RuntimeError(
-            "uv is required to run isolated engine workers. "
-            "Install it with `python -m pip install uv` or from Astral."
-        )
-    return uv
+    if uv is not None:
+        return uv
+
+    interpreter_dir = Path(sys.executable).resolve().parent
+    names = ("uv.exe", "uv") if sys.platform == "win32" else ("uv",)
+    for name in names:
+        candidate = interpreter_dir / name
+        if candidate.is_file():
+            return str(candidate)
+
+    prefix_bin = Path(sys.prefix) / ("Scripts" if sys.platform == "win32" else "bin")
+    for name in names:
+        candidate = prefix_bin / name
+        if candidate.is_file():
+            return str(candidate)
+
+    raise RuntimeError(
+        "uv is required to run isolated engine workers. Install it into the same Python "
+        "environment as ourTTS with `python -m pip install uv`, or install uv system-wide."
+    )
 
 
 def build_worker_command(

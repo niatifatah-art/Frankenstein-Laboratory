@@ -1,131 +1,221 @@
-# Frankenstein Laboratory
+# ourTTS + Frankenstein Laboratory
 
-A reproducible laboratory for **running, benchmarking, dissecting, integrating, and learning from open-source text-to-speech systems** while progressively building an independent modular TTS platform.
+**ourTTS** is the simple local text-to-speech product built on top of **Frankenstein Laboratory**, the R&D layer where open TTS engines are isolated, qualified, benchmarked and dissected.
 
-This is not a "many models behind one UI" project. Every external engine is isolated, licensed/provenanced separately, tested against shared contracts, and promoted only after real evidence exists. The long-term product boundary is **OurTTS**; Frankenstein Laboratory remains the place where external systems are qualified, compared and dissected.
+You should not need to know which upstream model is underneath just to create speech.
 
-## Current qualification state
+> Current stage: **v0.8 Windows/onboarding pass**. Native Windows and Linux are first-class product targets. External engines remain replaceable and keep their own code, weight, dataset and voice-asset provenance.
 
-Real synthesis/conversion evidence retained by the laboratory:
+## Start here
 
-- **Kokoro 0.9.4** — ready
-- **Pocket TTS 2.1.0** — ready; real streaming qualification
-- **Chatterbox Base** — ready
-- **Chatterbox Nano** — ready
-- **Chatterbox Turbo** — ready
-- **Chatterbox Multilingual V3** — ready
-- **Qwen3-TTS 0.6B CustomVoice** — ready
-- **Qwen3-TTS 0.6B Base** — ready; synthetic-reference cloning qualification
-- **Qwen3-TTS 1.7B VoiceDesign** — ready; functionally CPU-qualified but extremely slow there
-- **VoxCPM2** — ready
-- **MeloTTS** — ready after worker-local legacy compatibility fixes
-- **OpenVoice V2** — qualified voice-conversion component; deliberately not presented as standalone TTS
-- **CosyVoice3** — source/submodule install verified; full checkpoint inference not yet claimed
-- **VibeVoice Realtime** — research zone because current use restrictions are stricter than ordinary permissive-runtime policy
+### Windows 10/11 — native
 
-"Ready" means the lab loaded the real model, generated PCM WAV audio, validated the artifact and retained qualification evidence. It does **not** mean every backend is fast on every device.
+Use **Python 3.12 x64**. WSL is not required.
 
-## OurTTS owned core — v0.3
+Clone the repository, open PowerShell in it, then run:
 
-The repository now contains product-facing subsystems that do not belong to any single upstream model:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-windows.ps1
+```
 
-- deterministic Text Engine with Unicode normalization, segmentation and script hints
-- persistent pronunciation lexicon with text and phoneme overrides kept distinct
-- engine-neutral Prosody Timeline and control-marker parser
-- exact PCM digital-silence insertion without hidden resampling
-- VoicePack v1 schema with provenance, consent status, per-backend cached states and SHA-256 validation
-- synthesis planner that classifies controls as native, core post-processing or unsupported
-- performance-aware router using retained CPU RTF measurements instead of treating "CPU works" as "CPU is fast"
+Generate your first WAV without activating the virtual environment:
 
-These are intentionally small, auditable foundations. Language-specific semantic normalization, full G2P, alignment, advanced prosody rendering and original acoustic models are future layers rather than fake claims in v0.3.
+```powershell
+.\.venv\Scripts\ourtts.exe generate `
+  --text "Hello from ourTTS on Windows." `
+  --language en `
+  --quality fast `
+  --output .\hello.wav
+```
 
-## Core laboratory infrastructure
+Open the local Studio by double-clicking:
 
-- machine-readable engine, licensing, hardware and capability registry
-- strict integration states (`ready`, `adapter_ready`, `qualified_component`, `install_verified`, `researching`, etc.)
-- isolated `uv` worker contracts
-- common worker JSON result parsing
-- shared multilingual benchmark corpus
-- PCM WAV validation and SHA-256 artifact identity
-- reproducible benchmark result writer
-- capability/language/performance router that only selects qualified TTS engines
-- date-scoped license overlays backed by primary upstream sources
-- registry validation and CI tests
-- qualification workflows that preserve failures instead of hiding them
+```text
+start-ourtts-studio.cmd
+```
 
-## Quick start
+or run:
+
+```powershell
+.\.venv\Scripts\ourtts-api.exe
+```
+
+and open `http://127.0.0.1:7860/`.
+
+For an install + real model/audio smoke in one command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-windows.ps1 -TestAudio
+```
+
+See [`docs/platforms/windows.md`](docs/platforms/windows.md) for diagnostics, reset instructions and the exact Windows support boundary.
+
+### Linux
+
+Python 3.12 is recommended because it overlaps the broadest current worker set.
 
 ```bash
-python -m pip install -e ".[dev]"
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip uv
+python -m pip install -e ".[api]"
+
+ourtts plan --text "Hello from ourTTS." --language en
+ourtts generate --text "Hello from ourTTS." --language en --quality fast --output hello.wav
+```
+
+Run the local Studio:
+
+```bash
+ourtts-api
+```
+
+then open `http://127.0.0.1:7860/`.
+
+## The simple product path
+
+Preview what Auto will do:
+
+```bash
+ourtts plan --text "Hello world" --language en
+```
+
+Generate real speech:
+
+```bash
+ourtts generate \
+  --text "Hello world" \
+  --language en \
+  --quality auto \
+  --output speech.wav
+```
+
+Product quality modes are intentionally small:
+
+- `auto` — choose a qualified route automatically;
+- `fast` — prefer measured low-cost/realtime-capable routes;
+- `local` — request local/offline inference;
+- `best` — only works where the quality ledger contains real comparable evidence. It is not a fake marketing switch.
+
+`ourtts generate` writes the WAV plus a manifest explaining what engine was chosen and why.
+
+## Voices and VoicePacks
+
+A product voice is a managed **VoicePack**, not a loose anonymous WAV and not a backend-specific voice name that another engine might ignore.
+
+Inspect one:
+
+```bash
+ourtts voice inspect voices/my_voice
+```
+
+Prepare a reusable backend-specific state when the adapter supports it:
+
+```bash
+ourtts voice prepare voices/my_voice --engine chatterbox_nano
+```
+
+Prepared states are cached acceleration/conditioning artifacts tied to the exact backend/model revision and reference hash. They are **not** presented as a universal ourTTS speaker embedding.
+
+Voice cloning keeps provenance separate from model licensing. A model being open source does not grant rights to clone an arbitrary person. Unknown/unsafe reference provenance is rejected by the product path rather than silently accepted.
+
+## Local API and Studio
+
+Install the API extra if needed:
+
+```bash
+python -m pip install -e ".[api]"
+ourtts-api
+```
+
+The local server exposes the product API and Studio on `127.0.0.1:7860`.
+
+The product layer currently includes:
+
+- simple text → WAV generation;
+- Auto/Fast/Local/Best routing semantics;
+- managed VoicePack identities;
+- prepared reusable voice states where qualified;
+- exact PCM pause rendering in the owned renderer;
+- pronunciation/prosody foundations;
+- local REST API;
+- lightweight browser Studio;
+- product manifests and routing evidence.
+
+## Platform status
+
+| Platform | Core / CLI / API | Real product audio | Status |
+|---|---|---|---|
+| Windows 10/11 x64 | tested | tested with a real qualified CPU route | **native supported in v0.8** |
+| Linux x64 | tested extensively | tested across multiple qualified engines | **supported / primary R&D platform** |
+| macOS Apple Silicon | architecture-aware | not yet release-certified across the product path | **planned / experimental** |
+| macOS Intel | expected Python portability | not release-certified | **experimental** |
+
+Platform support does **not** mean every research engine is certified on that OS. An engine earns an OS-specific claim only after real model load, real PCM output validation and retained evidence on that platform.
+
+## What Frankenstein Laboratory does
+
+The laboratory stays underneath the simple product surface. It can hold many engines without forcing their dependency conflicts into one Python environment.
+
+Current retained real synthesis/conversion evidence includes Kokoro, Pocket TTS, Chatterbox Base/Nano/Turbo/Multilingual V3, Qwen3-TTS variants, VoxCPM2, MeloTTS and OpenVoice V2 as a voice-conversion component. Other systems stay research/external until their runtime and licensing boundary is proven.
+
+The lab owns:
+
+- isolated `uv` worker contracts;
+- machine-readable engine/capability/license registry;
+- multilingual benchmark corpus;
+- PCM/audio validation and SHA-256 evidence;
+- performance routing evidence;
+- quality ledger foundations;
+- research qualification workflows;
+- explicit `ready`, `qualified_component`, `qualified_external`, `researching`, etc. states.
+
+For research/developer work:
+
+```bash
+python -m pip install -e ".[dev,api]"
 python -m ttslab registry-check
 python -m ttslab list
-python -m ttslab corpus
 python -m ttslab doctor
+python -m ttslab route --language en --prefer streaming --max-generation-rtf 2
 pytest
 ```
 
-Run qualified backends:
+## Rules that do not get weakened
 
-```bash
-python -m ttslab run kokoro --text "hello world" --output outputs/kokoro.wav
-python -m ttslab run pocket_tts --text "hello world" --output outputs/pocket.wav
-```
+- source-code license != model-weight license != dataset license != voice-asset license;
+- voice consent/provenance is a separate fact again;
+- an adapter existing is not proof that a model works;
+- a model importing is not proof that it generated valid audio;
+- CPU-compatible is not the same as a good CPU choice;
+- unsupported controls are rejected/reported instead of silently ignored;
+- research-only/non-commercial/unresolved checkpoints do not silently enter product routing;
+- one engine's dependency conflict must not break the Core;
+- benchmark claims need retained evidence;
+- no model weights, secrets or personal reference audio belong in Git.
 
-Ask the router for a qualified backend and bound measured CPU generation cost:
+## Where this is going
 
-```bash
-python -m ttslab route --language en --prefer streaming --max-generation-rtf 2
-```
+Frankenstein Laboratory is not the final product and ourTTS is not intended to remain a wrapper forever. The long-term path is to move more value into owned components: text normalization/G2P, pronunciation repair, voice identity, prosody, streaming, evaluation, routing, decoding and eventually original synthesis models/checkpoints where the research evidence justifies it.
 
-Inspect our text/pronunciation/control layer:
+Near-term priorities after the Windows/onboarding pass are:
 
-```bash
-python -m ttslab text \
-  --text "DevShelf says Yessss! [[pause:320ms]] Really." \
-  --language en \
-  --lexicon examples/pronunciation-v1.json
-```
+1. common quality evaluation (WER/CER, naturalness, speaker similarity, failures, hallucination/repetition);
+2. evidence-backed `Best` routing;
+3. more prepared VoicePack states and persistent workers;
+4. deeper pronunciation repair and executable prosody;
+5. streaming product/API paths and better Studio UX;
+6. macOS certification;
+7. component harvesting/reimplementation toward original ourTTS models.
 
-Build an engine-aware synthesis plan:
+## Project docs
 
-```bash
-python -m ttslab plan \
-  --text "Hello from OurTTS." \
-  --language en \
-  --control pause=320 \
-  --max-generation-rtf 2
-```
+- [`PROJECT_INSTRUCTIONS.md`](PROJECT_INSTRUCTIONS.md) — laboratory constitution
+- [`docs/product/OURTTS_AGENT_PROMPT.md`](docs/product/OURTTS_AGENT_PROMPT.md) — product engineering mission
+- [`docs/product/PRODUCT_FOUNDATION.md`](docs/product/PRODUCT_FOUNDATION.md) — product architecture and UX boundary
+- [`docs/platforms/windows.md`](docs/platforms/windows.md) — native Windows setup and support
+- [`benchmarks/quality/`](benchmarks/quality/) — quality-evidence foundation
 
-Validate owned formats:
+---
 
-```bash
-python -m ttslab lexicon-check examples/pronunciation-v1.json
-python -m ttslab prosody-check examples/prosody-v1.json
-python -m ttslab voicepack-check examples/voicepack-v1 --skip-hashes
-```
-
-Run one reproducible benchmark corpus case:
-
-```bash
-python -m ttslab benchmark pocket_tts --case ar_en_codeswitch
-```
-
-Experimental adapters remain gated behind `smoke` until a real-model qualification run passes:
-
-```bash
-python -m ttslab smoke <engine> --text "hello world"
-```
-
-## Rules
-
-- code license != model weights license != dataset license != voice asset license
-- a README claim is not our benchmark result
-- an adapter existing is not the same as a model working
-- a model loading is not the same as valid audio
-- CPU-compatible is not the same as CPU-realtime
-- research-only components do not silently enter runtime routing
-- one engine's dependency conflict must not break the laboratory
-- unsupported controls remain unsupported instead of being silently ignored
-- unmeasured values stay unknown
-
-See `PROJECT_INSTRUCTIONS.md` for the project constitution and `docs/architecture/ourtts-v0.3-owned-core.md` for the owned-core boundary.
+**Frankenstein Laboratory finds out what is actually good. ourTTS gives the user one sane way to use it.**
