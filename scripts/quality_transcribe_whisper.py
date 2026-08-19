@@ -54,7 +54,7 @@ def transcribe_samples(
                 verbose=False,
             )
             item["hypothesis_text"] = str(result.get("text", "")).strip()
-        except Exception as exc:  # evaluator failures must remain visible in retained evidence
+        except Exception as exc:  # noqa: BLE001 - isolate one evaluator sample, retain the cast
             errors += 1
             item["hypothesis_text"] = None
             item["evaluation_error"] = f"{type(exc).__name__}: {exc}"
