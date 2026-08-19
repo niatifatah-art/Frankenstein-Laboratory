@@ -19,8 +19,8 @@ api = [
 ]
 
 [project.scripts]
-ttslab = "ttslab.cli:main"
-ourtts = "ttslab.product_cli:main"
+ttslab = "ttslab.entrypoints:lab_main"
+ourtts = "ttslab.entrypoints:product_main"
 ourtts-api = "ttslab.product_api:main"
 
 [tool.setuptools]
