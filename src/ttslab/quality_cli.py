@@ -6,6 +6,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
+from .quality_cast import cast_quality
 from .quality_suite import (
     QUALITY_SUITE_VERSION,
     aggregate_objective,
@@ -54,6 +55,38 @@ def _cmd_score(args: argparse.Namespace) -> int:
     score = score_transcript(args.reference, args.hypothesis)
     print(json.dumps(score.to_dict(), ensure_ascii=False, indent=2))
     return 0
+
+
+def _cmd_cast(args: argparse.Namespace) -> int:
+    samples = cast_quality(
+        args.engine,
+        output_root=args.output_dir,
+        language=args.language,
+        task=args.task,
+        max_cases=args.max_cases,
+        timeout_seconds=args.timeout,
+    )
+    payload = {
+        "schema_version": 1,
+        "suite_version": QUALITY_SUITE_VERSION,
+        "evaluator": None,
+        "samples": [sample.to_dict() for sample in samples],
+    }
+    write_json(payload, args.samples)
+    passed = sum(sample.status == "passed" for sample in samples)
+    print(
+        json.dumps(
+            {
+                "samples": len(samples),
+                "passed": passed,
+                "failed": len(samples) - passed,
+                "output_dir": str(args.output_dir),
+                "sample_manifest": str(args.samples),
+            },
+            ensure_ascii=False,
+        )
+    )
+    return 0 if passed == len(samples) else 1
 
 
 def _cmd_summarize(args: argparse.Namespace) -> int:
@@ -135,6 +168,19 @@ def build_parser() -> argparse.ArgumentParser:
     score.add_argument("--reference", required=True)
     score.add_argument("--hypothesis", required=True)
     score.set_defaults(func=_cmd_score)
+
+    cast = sub.add_parser(
+        "cast",
+        help="Generate the same controlled corpus cases across one or more real engines.",
+    )
+    cast.add_argument("--engine", action="append", required=True)
+    cast.add_argument("--language", required=True)
+    cast.add_argument("--task", choices=["general", "cloning", "expressive", "long_form"], default="general")
+    cast.add_argument("--max-cases", type=int)
+    cast.add_argument("--timeout", type=float, default=1800.0)
+    cast.add_argument("--output-dir", type=Path, default=Path("benchmarks/quality/cast"))
+    cast.add_argument("--samples", type=Path, default=Path("benchmarks/quality/samples.json"))
+    cast.set_defaults(func=_cmd_cast)
 
     summarize = sub.add_parser("summarize", help="Aggregate objective sample evidence.")
     summarize.add_argument("samples", type=Path)
