@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from .pronunciation import AppliedOverride
 from .registry import EngineRecord
 
 
@@ -165,7 +166,7 @@ def compile_adapter_args(
             unsupported.append("speed")
 
     if device and device != "auto":
-        if key.startswith("chatterbox_") or key.startswith("qwen3_") or key in {"voxcpm2", "melotts"}:
+        if key.startswith(("chatterbox_", "qwen3_")) or key in {"voxcpm2", "melotts"}:
             args += ["--device", device]
         elif device != "cpu":
             unsupported.append("device")
@@ -177,14 +178,16 @@ def compile_adapter_args(
     )
 
 
-def render_kokoro_phoneme_overrides(text: str, overrides: tuple[object, ...]) -> str:
+def render_kokoro_phoneme_overrides(
+    text: str, overrides: tuple[AppliedOverride, ...]
+) -> str:
     """Render generic structured phoneme overrides using Kokoro's documented inline syntax."""
-    phonemes = [item for item in overrides if getattr(item, "mode", None) == "phoneme"]
+    phonemes = [item for item in overrides if item.mode == "phoneme"]
     rendered = text
-    for item in sorted(phonemes, key=lambda entry: int(getattr(entry, "start")), reverse=True):
-        start = int(getattr(item, "start"))
-        end = int(getattr(item, "end"))
-        replacement = str(getattr(item, "replacement"))
+    for item in sorted(phonemes, key=lambda entry: int(entry.start), reverse=True):
+        start = int(item.start)
+        end = int(item.end)
+        replacement = str(item.replacement)
         surface = rendered[start:end]
         if not surface:
             continue
