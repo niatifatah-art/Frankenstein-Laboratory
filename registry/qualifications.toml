@@ -38,9 +38,13 @@ qualification_run = 32180309921
 artifact_id = 9340570332
 artifact_digest = "sha256:7acf03b9385cf01a5e858c0e41ffcc54bc764ce879087c56dc4a1ee300c5746b"
 hardware = ["cpu", "cuda"]
+capabilities = ["cpu", "voice_cloning", "paralinguistic_tags", "style_control", "voice_cache"]
 cpu_generation_rtf = 4.586946758333333
 cpu_cold_start_seconds = 55.709930763
-notes = "Qualified on GitHub Ubuntu CPU using a synthetic Kokoro reference owned by the lab. 4.68 s PCM/24 kHz audio; load 34.24 s; generation 21.47 s; generation RTF 4.59. PerTh remained enabled."
+prepared_voice_run = 32259366050
+prepared_voice_artifact_id = 9367680603
+prepared_voice_artifact_digest = "sha256:c8306b0f3044ed1ad69625e630c021a29fe9d75ff8b092414fea8ebd7e3b351e"
+notes = "Qualified on GitHub Ubuntu CPU using a synthetic Kokoro reference owned by the lab. 4.68 s PCM/24 kHz audio; load 34.24 s; generation 21.47 s; generation RTF 4.59. PerTh remained enabled. Prepared VoicePack state reuse was later proven end-to-end in run 32259366050: the product route loaded a saved Chatterbox Conditionals state, passed no raw reference to synthesis, and produced validated WAV evidence."
 
 [qualification.chatterbox_turbo]
 integration_status = "ready"

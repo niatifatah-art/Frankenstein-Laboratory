@@ -7,6 +7,7 @@ from ttslab.adapter_runtime import (
     adapter_args,
     adapter_supported_controls,
     adapter_supports_reference,
+    adapter_supports_voice_state,
     engine_requires_reference,
 )
 
@@ -47,6 +48,33 @@ def test_reference_is_never_silently_ignored(tmp_path: Path) -> None:
         adapter_args("kokoro", RuntimeInputs(language="en", reference=reference))
     with pytest.raises(ValueError, match="does not consume reference audio"):
         adapter_args("pocket_tts", RuntimeInputs(language="en", reference=reference))
+
+
+def test_prepared_voice_state_maps_only_to_verified_chatterbox_adapters(tmp_path: Path) -> None:
+    state = tmp_path / "voice.conds.pt"
+    assert adapter_supports_voice_state("chatterbox_nano") is True
+    assert adapter_supports_voice_state("qwen3_base_06b") is False
+    assert adapter_args(
+        "chatterbox_nano",
+        RuntimeInputs(language="en", voice_state=state),
+    ) == ["--voice-state", str(state)]
+    assert adapter_args(
+        "chatterbox_v3",
+        RuntimeInputs(language="fr", voice_state=state),
+    ) == ["--language", "fr", "--voice-state", str(state)]
+    with pytest.raises(ValueError, match="does not consume prepared voice state"):
+        adapter_args("qwen3_base_06b", RuntimeInputs(language="en", voice_state=state))
+
+
+def test_reference_and_prepared_state_are_mutually_exclusive(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        adapter_args(
+            "chatterbox_nano",
+            RuntimeInputs(
+                reference=tmp_path / "reference.wav",
+                voice_state=tmp_path / "voice.conds.pt",
+            ),
+        )
 
 
 def test_normalized_controls_require_real_adapter_mapping() -> None:
