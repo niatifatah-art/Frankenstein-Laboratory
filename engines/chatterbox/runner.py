@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 SCHEMA_VERSION = 1
+ADAPTER_VERSION = "0.2.0"
 UPSTREAM_REVISION = "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
 STATE_FORMAT = "chatterbox-conditionals-pt-v1"
 
@@ -40,36 +41,15 @@ def describe(variant: str) -> dict[str, object]:
             "voice_cache": True,
             "multilingual": True,
             "languages": [
-                "ar",
-                "da",
-                "de",
-                "el",
-                "en",
-                "es",
-                "fi",
-                "fr",
-                "he",
-                "hi",
-                "it",
-                "ja",
-                "ko",
-                "ms",
-                "nl",
-                "no",
-                "pl",
-                "pt",
-                "ru",
-                "sv",
-                "sw",
-                "tr",
-                "zh",
+                "ar", "da", "de", "el", "en", "es", "fi", "fr", "he", "hi", "it",
+                "ja", "ko", "ms", "nl", "no", "pl", "pt", "ru", "sv", "sw", "tr", "zh",
             ],
         },
     }
     return {
         "schema_version": SCHEMA_VERSION,
         "engine": f"chatterbox_{variant}",
-        "adapter_version": "0.2.0",
+        "adapter_version": ADAPTER_VERSION,
         "upstream_revision": UPSTREAM_REVISION,
         "voice_state_format": STATE_FORMAT,
         "capabilities": caps[variant],
@@ -132,6 +112,7 @@ def prepare_voice(args: argparse.Namespace) -> int:
                 "schema_version": 1,
                 "operation": "prepare_voice",
                 "engine": f"chatterbox_{args.variant}",
+                "adapter_version": ADAPTER_VERSION,
                 "state_path": str(state_output),
                 "state_format": STATE_FORMAT,
                 "upstream_revision": UPSTREAM_REVISION,
@@ -187,6 +168,7 @@ def synthesize(args: argparse.Namespace) -> int:
     result = {
         "schema_version": 1,
         "engine": f"chatterbox_{args.variant}",
+        "adapter_version": ADAPTER_VERSION,
         "output_path": str(output),
         "sample_rate": sample_rate,
         "audio_duration_seconds": duration,
