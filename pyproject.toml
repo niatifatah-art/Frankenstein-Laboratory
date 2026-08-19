@@ -30,7 +30,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-tslab = ["studio/*.html", "studio/*.css", "studio/*.js"]
+ttslab = ["studio/*.html", "studio/*.css", "studio/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
