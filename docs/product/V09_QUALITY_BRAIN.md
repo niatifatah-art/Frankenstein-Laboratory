@@ -10,6 +10,21 @@ This pass turns the existing empty quality ledger and routing contract into an e
 
 Every sample begins with a real engine run against a case from the existing shared corpus in `benchmarks/corpus.json`.
 
+A local real-model cast can be started with:
+
+```bash
+ourtts-quality cast \
+  --engine kokoro \
+  --engine pocket_tts \
+  --language en \
+  --task general \
+  --max-cases 10 \
+  --output-dir benchmarks/quality/cast/audio \
+  --samples benchmarks/quality/cast/samples-generated.json
+```
+
+The command sends the **same selected corpus cases** through every requested engine. It retains per-case benchmark JSON, audio hashes, passed/failed states, and a common sample manifest. A failed generation remains a sample and contributes to failure rate.
+
 Retain at least:
 
 - engine key and exact model/source revision when available;
@@ -19,17 +34,15 @@ Retain at least:
 - runtime/hardware metadata;
 - an artifact/run reference.
 
-A failed generation remains a sample. It contributes to failure rate and must not disappear from the dataset.
-
 ### 2. Objective transcript evidence
 
 A fixed ASR evaluator produces a hypothesis transcript from generated audio. The quality pipeline stores both the original text and hypothesis, then computes corpus-level:
 
 - WER;
 - CER;
-- failure rate.
+- generation failure rate.
 
-`ourtts-quality score` is deterministic and dependency-light. The ASR model that produced the hypothesis is intentionally outside this Core module so evaluator model/version/hardware can be pinned and recorded independently.
+`ourtts-quality score` is deterministic and dependency-light. The ASR model that produced the hypothesis is intentionally outside the Core package so evaluator model/version/hardware can be pinned and recorded independently.
 
 Example:
 
@@ -38,6 +51,14 @@ ourtts-quality score \
   --reference "Hello, reproducible world!" \
   --hypothesis "hello reproducible world"
 ```
+
+The repository also contains `scripts/quality_transcribe_whisper.py`. The manual quality-cast workflow installs the official OpenAI Whisper implementation at revision:
+
+```text
+5f86d1d86363843179951550570367b37c5d6f78
+```
+
+and records the chosen Whisper model, device, Python version and platform in the retained sample manifest. Changing the evaluator revision/model creates a different evaluation condition and must be recorded rather than mixed silently with an older cast.
 
 For release casts, use one fixed evaluator configuration for every engine in a comparison. Do not compare WER from different ASR evaluators as though it were the same measurement.
 
@@ -103,9 +124,27 @@ The common corpus is classified into four product quality tasks:
 
 ## Evaluators
 
-The recommended first objective evaluator is the official OpenAI Whisper implementation using one pinned model/configuration for a complete cast. WER/CER semantics should remain compatible with standard edit-distance evaluation (JiWER is a useful independent reference implementation).
+The first objective evaluator is the official OpenAI Whisper implementation using one pinned revision/model configuration for a complete cast. WER/CER semantics remain standard edit-distance measurements; JiWER is a useful independent reference implementation.
 
 Speaker identity is deliberately separate from naturalness and transcript accuracy. A later cloning-quality pass can add a pinned speaker-verification evaluator such as an ECAPA-TDNN system, but its similarity score must remain a separate raw metric until a reviewed routing policy decides how to use it.
+
+## Manual real-model workflow
+
+`.github/workflows/quality-cast-manual.yml` is intentionally `workflow_dispatch` only.
+
+Its first controlled cast:
+
+1. installs the lab tooling;
+2. generates the same English/general cases with Kokoro and Pocket TTS;
+3. installs the pinned official Whisper evaluator;
+4. transcribes each successful generation;
+5. aggregates objective WER/CER/failure evidence;
+6. builds a blinded human-listening packet;
+7. records evaluator/host provenance;
+8. uploads the complete cast directory even when generation or ASR fails;
+9. only then marks the run failed if a stage failed.
+
+`HF_TOKEN` is passed only from the GitHub Actions secret when present. It is never committed or printed. This matters for upstream assets/models whose access state may change over time.
 
 ## CI policy
 
@@ -114,9 +153,11 @@ Normal PR CI tests only:
 - normalization and WER/CER math;
 - corpus/task selection;
 - failure aggregation;
+- real-cast orchestration with mocked model execution;
 - blind-packet determinism;
 - release-evidence gates;
 - CLI contracts;
+- Whisper helper contract without downloading Whisper;
 - Windows/Linux portability of the evidence tooling.
 
 It does **not** download every TTS model and ASR evaluator on every source change.
