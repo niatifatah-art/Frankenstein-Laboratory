@@ -116,8 +116,22 @@ jobs:
           import json
           import wave
           from pathlib import Path
+
           root = Path("outputs/v05-voice")
-          payload = json.loads((root / "direct-state.json").read_text())
+          raw = (root / "direct-state.json").read_text()
+          payload = None
+          for line in reversed(raw.splitlines()):
+              candidate = line.strip()
+              if not candidate.startswith("{"):
+                  continue
+              try:
+                  parsed = json.loads(candidate)
+              except json.JSONDecodeError:
+                  continue
+              if isinstance(parsed, dict):
+                  payload = parsed
+                  break
+          assert payload is not None, raw[-4000:]
           assert payload["engine"] == "chatterbox_nano"
           assert payload["voice_state"]
           assert payload["reference"] is None
