@@ -5,9 +5,11 @@ on:
     paths:
       - "src/ttslab/quality.py"
       - "src/ttslab/quality_suite.py"
+      - "src/ttslab/quality_cast.py"
       - "src/ttslab/quality_cli.py"
       - "tests/test_quality.py"
       - "tests/test_quality_suite.py"
+      - "tests/test_quality_cast.py"
       - "benchmarks/corpus.json"
       - "benchmarks/quality/**"
       - "docs/product/V09_QUALITY_BRAIN.md"
@@ -41,13 +43,16 @@ jobs:
         run: ruff check src tests
 
       - name: Quality tests
-        run: pytest tests/test_quality.py tests/test_quality_suite.py
+        run: pytest tests/test_quality.py tests/test_quality_suite.py tests/test_quality_cast.py
 
       - name: Quality CLI corpus smoke
         run: ourtts-quality corpus --language en --task general --output quality-corpus.json
 
       - name: Quality CLI transcript smoke
         run: ourtts-quality score --reference "Hello reproducible world" --hypothesis "hello reproducible world"
+
+      - name: Quality CLI cast contract smoke
+        run: ourtts-quality cast --help
 
       - name: Upload corpus smoke
         uses: actions/upload-artifact@v4
