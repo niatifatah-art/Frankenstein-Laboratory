@@ -57,23 +57,39 @@ _QWEN_LANG = {
     "it": "Italian",
 }
 
+_NORMALIZED_CONTROL_SUPPORT: dict[str, frozenset[str]] = {
+    "kokoro": frozenset({"pace"}),
+    "melotts": frozenset({"pace"}),
+    "qwen3_custom_06b": frozenset({"style"}),
+    "qwen3_voice_design_17b": frozenset({"voice_design"}),
+}
+
+
+def adapter_supported_controls(engine_key: str) -> frozenset[str]:
+    """Return normalized controls that this adapter actually translates today."""
+    return _NORMALIZED_CONTROL_SUPPORT.get(engine_key, frozenset())
+
 
 def adapter_args(engine_key: str, inputs: RuntimeInputs) -> list[str]:
     """Translate normalized OurTTS inputs into one worker's explicit CLI arguments.
 
-    This mapping is deliberately small and auditable. Unknown controls are not silently converted.
+    This mapping is deliberately small and auditable. Unknown controls are rejected instead of
+    being silently dropped. A few legacy backend-specific controls remain accepted for the
+    Chatterbox Base adapter until normalized mappings replace them.
     """
     args: list[str] = []
     language = inputs.language.casefold() if inputs.language else None
     controls = inputs.controls or {}
 
     if engine_key == "pocket_tts":
+        _reject_unknown_controls(engine_key, controls, set())
         _append_language(args, language, _POCKET_LANG)
         if inputs.voice:
             args.extend(["--voice", inputs.voice])
         return args
 
     if engine_key == "kokoro":
+        _reject_unknown_controls(engine_key, controls, {"pace"})
         _append_language(args, language, _KOKORO_LANG)
         if inputs.voice:
             args.extend(["--voice", inputs.voice])
@@ -82,12 +98,14 @@ def adapter_args(engine_key: str, inputs: RuntimeInputs) -> list[str]:
         return args
 
     if engine_key == "melotts":
+        _reject_unknown_controls(engine_key, controls, {"pace"})
         _append_language(args, language, _MELO_LANG)
         if "pace" in controls:
             args.extend(["--speed", str(float(controls["pace"]))])
         return args
 
     if engine_key == "chatterbox_v3":
+        _reject_unknown_controls(engine_key, controls, set())
         if language:
             args.extend(["--language", language])
         if inputs.reference:
@@ -95,6 +113,8 @@ def adapter_args(engine_key: str, inputs: RuntimeInputs) -> list[str]:
         return args
 
     if engine_key in {"chatterbox_base", "chatterbox_nano", "chatterbox_turbo"}:
+        allowed = {"exaggeration", "cfg_weight"} if engine_key == "chatterbox_base" else set()
+        _reject_unknown_controls(engine_key, controls, allowed)
         if inputs.reference:
             args.extend(["--reference", str(inputs.reference)])
         if engine_key == "chatterbox_base":
@@ -105,6 +125,8 @@ def adapter_args(engine_key: str, inputs: RuntimeInputs) -> list[str]:
         return args
 
     if engine_key.startswith("qwen3_"):
+        allowed = set(adapter_supported_controls(engine_key))
+        _reject_unknown_controls(engine_key, controls, allowed)
         _append_language(args, language, _QWEN_LANG)
         if inputs.reference:
             args.extend(["--reference", str(inputs.reference)])
@@ -117,10 +139,12 @@ def adapter_args(engine_key: str, inputs: RuntimeInputs) -> list[str]:
         return args
 
     if engine_key == "voxcpm2":
+        _reject_unknown_controls(engine_key, controls, set())
         if inputs.reference:
             args.extend(["--reference", str(inputs.reference)])
         return args
 
+    _reject_unknown_controls(engine_key, controls, set())
     return args
 
 
@@ -136,3 +160,11 @@ def _append_language(args: list[str], language: str | None, mapping: dict[str, s
     except KeyError as exc:
         raise ValueError(f"No verified adapter language mapping for {language!r}") from exc
     args.extend(["--language", worker_language])
+
+
+def _reject_unknown_controls(engine_key: str, controls: dict[str, Any], allowed: set[str]) -> None:
+    unsupported = sorted(set(controls) - allowed)
+    if unsupported:
+        raise ValueError(
+            f"Adapter {engine_key!r} does not translate controls: {', '.join(unsupported)}"
+        )
