@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-import ttslab.isolation as isolation
+from ttslab import isolation
 
 
 def test_uv_prefers_path_when_available(monkeypatch: pytest.MonkeyPatch) -> None:
