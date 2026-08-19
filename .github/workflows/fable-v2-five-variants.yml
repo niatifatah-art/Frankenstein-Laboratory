@@ -1,0 +1,12 @@
+name: fable-v2-five-variants-archived
+
+on:
+  workflow_dispatch:
+
+jobs:
+  evidence-note:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Historical Fable variant listening experiment archived to manual-only evidence."
+          echo "The original executable recipe remains recoverable from Git history."

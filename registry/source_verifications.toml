@@ -1,0 +1,88 @@
+# Pinned repository heads from research-source-sweep run 32183788463.
+# Every repo was reachable and exposed a LICENSE/Licence file on the exact revision below.
+# Combined evidence artifact: 9341702081
+# Artifact digest: sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a
+
+[source.dia2]
+source_revision = "8687268f4ed3ed20704638fd353b51491de3b476"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.glm_tts]
+source_revision = "4b944f4be7b6c55454751715081f4dc83992897a"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.styletts2]
+source_revision = "5cedc71c333f8d8b8551ca59378bdcc7af4c9529"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.fireredtts2]
+source_revision = "404f3f61d25bb4804859b588a6a734bf8468090c"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.csm_sesame]
+source_revision = "daed31e6d42cf71873999075de204fa37d2acec3"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.bark]
+source_revision = "f4f32d4cd480dfec1c245d258174bc9bde3c2148"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.f5_tts]
+source_revision = "9c614e9657089213efc6a7421b30630be138a3f5"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.spark_tts]
+source_revision = "2f1ea9082400547242641f5271b6f941c9f439d1"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.fish_speech]
+source_revision = "e5e292632cb11e7a27b2b7487f58f612bc101e13"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.higgs_audio]
+source_revision = "05a145bb490501b534563bf51bf2f7aa2326b271"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.xtts_v2]
+source_revision = "dbf1a08a0d4e47fdad6172e433eeb34bc6b13b4e"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.indextts2]
+source_revision = "ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.megatts3]
+source_revision = "67395f2d590b48eea88f7f834469da333f48a161"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"
+
+[source.orpheus_tts]
+source_revision = "e64661fe6d02c414fc77c53578c9d64082614861"
+qualification_run = 32183788463
+artifact_id = 9341702081
+artifact_digest = "sha256:4333c69d8921d31ef02d4d21e90906245a4d276b8d5a09286431d45a21db075a"

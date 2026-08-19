@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "jobs": [
+    {
+      "id": "fast-preview",
+      "text": "Hello from the fast CPU profile.",
+      "output": "fast-preview.wav",
+      "language": "en",
+      "profile": "fast_cpu"
+    },
+    {
+      "id": "pronunciation-and-pause",
+      "text": "Yessss! [[pause:320ms]] It actually works.",
+      "output": "pronunciation-and-pause.wav",
+      "language": "en",
+      "engine": "kokoro",
+      "voice": "af_heart",
+      "lexicon": "examples/pronunciation-v1.json"
+    }
+  ]
+}

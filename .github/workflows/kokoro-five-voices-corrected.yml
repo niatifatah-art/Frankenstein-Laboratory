@@ -1,0 +1,12 @@
+name: kokoro-five-voices-corrected-archived
+
+on:
+  workflow_dispatch:
+
+jobs:
+  evidence-note:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Historical five-voice Kokoro listening cast archived after retained artifacts."
+          echo "Current product correctness is exercised by lab-e2e through ourtts speak."

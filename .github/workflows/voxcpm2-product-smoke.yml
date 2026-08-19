@@ -1,0 +1,67 @@
+name: voxcpm2-product-smoke
+
+on:
+  pull_request:
+    paths:
+      - "engines/voxcpm2/**"
+      - "src/ttslab/adapter_args.py"
+      - "src/ttslab/synthesis.py"
+      - ".github/workflows/voxcpm2-product-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  voice-design:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade uv
+      - name: Real VoxCPM2 Voice Design through isolated worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs
+          uv run --project engines/voxcpm2 python engines/voxcpm2/runner.py \
+            --text "Frankenstein Laboratory is testing a real voice design path." \
+            --voice-design "A young adult synthetic male voice, warm, clear, energetic, and natural." \
+            --device cpu --steps 2 --max-len 100 --seed 42 \
+            --output outputs/voxcpm2-voice-design.wav \
+            | tee outputs/voxcpm2-voice-design.log
+      - name: Validate PCM artifact and worker metadata
+        run: |
+          python - <<'PY'
+          import json
+          import wave
+          from pathlib import Path
+
+          wav_path = Path("outputs/voxcpm2-voice-design.wav")
+          with wave.open(str(wav_path), "rb") as wav:
+              assert wav.getframerate() == 48000, wav.getframerate()
+              assert wav.getnframes() > 1000, wav.getnframes()
+              duration = wav.getnframes() / wav.getframerate()
+              assert duration > 0.2, duration
+
+          payload = None
+          for line in reversed(Path("outputs/voxcpm2-voice-design.log").read_text().splitlines()):
+              line = line.strip()
+              if line.startswith("{"):
+                  payload = json.loads(line)
+                  break
+          assert payload is not None
+          assert payload["engine"] == "voxcpm2"
+          assert payload["voice_design"]
+          assert payload["seed"] == 42
+          print(json.dumps({"duration": duration, "payload": payload}, ensure_ascii=False))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: voxcpm2-v04-voice-design
+          path: outputs/
+          if-no-files-found: error

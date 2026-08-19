@@ -1,0 +1,12 @@
+name: openvoice-component-capacity-archived
+
+on:
+  workflow_dispatch:
+
+jobs:
+  evidence-note:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "OpenVoice V2 real conversion evidence is retained in registry/qualifications.toml and its historical Actions artifact."
+          echo "This heavyweight component probe is manual-only in v0.4."

@@ -1,0 +1,140 @@
+# Mutable qualification evidence layered over registry/engines.toml.
+# Promotion to `ready` requires a real model load, synthesis, PCM WAV validation,
+# and a retained workflow artifact. Static licensing/provenance remains in engines.toml.
+# Performance values are environment-specific measurements, not universal rankings.
+
+[qualification.kokoro]
+cpu_generation_rtf = 1.4906056151111113
+cpu_ttfa_seconds = 8.378530439000002
+qualification_run = 32176075079
+artifact_id = 9339080752
+artifact_digest = "sha256:b8c8e626c8e2701c326113e10e448430b7e0ca4a69438d848e589fb2bdc3f1a7"
+notes = "Qualified on GitHub Ubuntu CPU with CPU-only PyTorch. 5.625 s PCM/24 kHz audio; worker RTF 1.49 and TTFA 8.38 s in a cold isolated run."
+
+[qualification.pocket_tts]
+cpu_generation_rtf = 0.3361526225409832
+cpu_ttfa_seconds = 0.1584713339999979
+cpu_cold_start_seconds = 7.267089464999998
+qualification_run = 32176431354
+artifact_id = 9339195954
+artifact_digest = "sha256:cc5164b5c9ce429a1f184abf4351cc2414a1a0dedae5a489ab856bc37e489217"
+notes = "Qualified streaming on GitHub Ubuntu CPU. 4.88 s PCM/24 kHz audio in 61 chunks; TTFA 158 ms; generation RTF 0.336; cold total 7.27 s including model and voice preparation."
+
+[qualification.chatterbox_base]
+integration_status = "ready"
+source_revision = "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+qualification_run = 32180309921
+artifact_id = 9340561759
+artifact_digest = "sha256:9125e75dffe09ff3086936b52c855ad0142bb3eda07375e233291cbd348b3415"
+hardware = ["cpu", "cuda", "mps"]
+cpu_generation_rtf = 7.7604615576086955
+cpu_cold_start_seconds = 84.614571048
+notes = "Qualified on GitHub Ubuntu CPU with current upstream source revision and PerTh enabled. 3.68 s PCM/24 kHz audio; load 56.05 s; generation 28.56 s; generation RTF 7.76. CPU works but is not a low-latency target."
+
+[qualification.chatterbox_nano]
+integration_status = "ready"
+source_revision = "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+qualification_run = 32180309921
+artifact_id = 9340570332
+artifact_digest = "sha256:7acf03b9385cf01a5e858c0e41ffcc54bc764ce879087c56dc4a1ee300c5746b"
+hardware = ["cpu", "cuda"]
+cpu_generation_rtf = 4.586946758333333
+cpu_cold_start_seconds = 55.709930763
+notes = "Qualified on GitHub Ubuntu CPU using a synthetic Kokoro reference owned by the lab. 4.68 s PCM/24 kHz audio; load 34.24 s; generation 21.47 s; generation RTF 4.59. PerTh remained enabled."
+
+[qualification.chatterbox_turbo]
+integration_status = "ready"
+source_revision = "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+qualification_run = 32180309921
+artifact_id = 9340585121
+artifact_digest = "sha256:b63838e99380573071918ad84f73a010b963e4dd1a2369458d6550fa992f0cff"
+hardware = ["cpu", "cuda"]
+cpu_generation_rtf = 3.973102395992366
+cpu_cold_start_seconds = 68.028891381
+notes = "Qualified on GitHub Ubuntu CPU using a synthetic Kokoro reference owned by the lab. 5.24 s PCM/24 kHz audio; load 47.18 s; generation 20.82 s; generation RTF 3.97. CPU functional but GPU remains the natural low-latency target."
+
+[qualification.chatterbox_v3]
+integration_status = "ready"
+source_revision = "5de7a54aa4e5e2baadb0182dde554908b48b85c2"
+qualification_run = 32180309921
+artifact_id = 9340596380
+artifact_digest = "sha256:cd5d7e56a8c5b0813fe1d0dbadcdbf299e5633a15854ebe84c236d9f660bbe03"
+hardware = ["cpu", "cuda", "mps"]
+cpu_generation_rtf = 12.033888803079712
+cpu_cold_start_seconds = 105.528986259
+notes = "Qualified on GitHub Ubuntu CPU using a synthetic Kokoro reference owned by the lab. 5.52 s PCM/24 kHz audio; load 39.10 s; generation 66.43 s; generation RTF 12.03. CPU works but is very slow for this multilingual checkpoint."
+
+[qualification.qwen3_custom_06b]
+integration_status = "ready"
+qualification_run = 32180309921
+artifact_id = 9340629250
+artifact_digest = "sha256:24e74dca477121e743235ad77cfb67e16d4cddb85e9cbc56c0e65471c283c128"
+hardware = ["cpu", "cuda_recommended"]
+cpu_generation_rtf = 26.923687163166665
+cpu_cold_start_seconds = 175.33290501800002
+notes = "Qualified on GitHub Ubuntu CPU with direct CPU-only PyTorch resolution. 6.00 s PCM/24 kHz audio; load 13.79 s; generation 161.54 s; generation RTF 26.92. Functionally CPU-capable but far too slow for CPU realtime routing."
+
+[qualification.qwen3_base_06b]
+integration_status = "ready"
+qualification_run = 32180309921
+artifact_id = 9340626087
+artifact_digest = "sha256:38215edf31961a9842a76f3779cff6ee52eb0b6a05754186b19a12ab422df5b5"
+hardware = ["cpu", "cuda_recommended"]
+cpu_generation_rtf = 34.87899842526596
+cpu_cold_start_seconds = 144.538023783
+notes = "Qualified voice cloning on GitHub Ubuntu CPU using a synthetic Kokoro reference owned by the lab. 3.76 s PCM/24 kHz audio; load 13.39 s; generation 131.15 s; generation RTF 34.88. Functional on CPU but CUDA is strongly preferred."
+
+[qualification.qwen3_voice_design_17b]
+integration_status = "ready"
+worker = "qwen3_voice_design_17b"
+qualification_run = 32181921851
+artifact_id = 9341167565
+artifact_digest = "sha256:145df309c2e107da586bd48ab6fb1473d2cad3236b6bbf448b8360689a46ff49"
+hardware = ["cpu", "cuda_recommended"]
+cpu_generation_rtf = 47.79
+cpu_cold_start_seconds = 160.07
+notes = "Qualified Qwen3-TTS 1.7B VoiceDesign on GitHub Ubuntu CPU. 2.88 s PCM/24 kHz audio; load 22.44 s; generation 137.63 s; total 160.07 s; generation RTF 47.79. CPU is functionally supported by the lab but far too slow for realtime routing; CUDA is strongly recommended."
+
+[qualification.voxcpm2]
+integration_status = "ready"
+qualification_run = 32180309921
+artifact_id = 9340560127
+artifact_digest = "sha256:3fc2e9266daede731d97a4a682fa0176620a181cfa5cc63188a6da5253ac8496"
+hardware = ["cpu", "cuda_recommended"]
+capabilities = ["multilingual", "streaming", "voice_cloning", "voice_design", "style_control"]
+cpu_generation_rtf = 5.412868793181814
+cpu_cold_start_seconds = 77.495856218
+notes = "Qualified on GitHub Ubuntu CPU with CPU-only PyTorch and load_denoiser=false. Model snapshot 32279effe8c19989596f05d353d1447f51d9e915. 5.28 s PCM/48 kHz audio; load 48.86 s; generation 28.58 s; generation RTF 5.41. v0.4 exposes upstream Voice Design and controllable/ultimate cloning through the worker; targeted product smoke is required for the new path."
+
+[qualification.melotts]
+integration_status = "ready"
+source_revision = "209145371cff8fc3bd60d7be902ea69cbdb7965a"
+qualification_run = 32183148056
+artifact_id = 9341509133
+artifact_digest = "sha256:462fc9692271643db6812f76cb97ebbaa21083b22e366e5b710a7d1981b7942f"
+hardware = ["cpu", "cuda"]
+cpu_generation_rtf = 1.245
+cpu_cold_start_seconds = 10.98
+notes = "Qualified English synthesis on GitHub Ubuntu CPU after isolating legacy compatibility: setuptools<81, NLTK 3.8.1, CPU PyTorch, and UniDic path redirected to bundled unidic-lite. 4.659 s PCM/44.1 kHz audio; load 5.18 s; generation 5.80 s; generation RTF 1.245."
+
+[qualification.cosyvoice3]
+integration_status = "qualified_external"
+source_revision = "074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc"
+qualification_run = 32189153493
+artifact_id = 9343947902
+artifact_digest = "sha256:549c9dc0f7b956e67daa949b58d426ffdd8e91aa18b25fb3ffbcf50c446060c3"
+hardware = ["cpu", "cuda_recommended"]
+notes = "Real Fun-CosyVoice3-0.5B-2512 zero-shot inference passed on GitHub Ubuntu CPU for five controlled synthetic references after the corrected Whisper-compatible source install. The retained artifact contains generated outputs. It remains non-routable until a stable isolated worker contract is added; this status reconciles real evidence without pretending product readiness."
+
+[qualification.openvoice_v2]
+integration_status = "qualified_component"
+source_revision = "74a1d147b17a8c3092dd5430504bd83ef6c7eb23"
+qualification_run = 32186303818
+artifact_id = 9342643600
+artifact_digest = "sha256:de65d080ee29778ab69526dab48a2ec9a0647c5387d5648541ebc67a0b4fce22"
+notes = "Real OpenVoice V2 ToneColorConverter qualification passed on GitHub Ubuntu CPU between two controlled synthetic Kokoro references. Output validated at 22.05 kHz with 117248 frames. Kept as a voice-conversion component, not a standalone text-to-waveform backend."
+
+[qualification.vibevoice_realtime]
+integration_status = "researching"
+source_revision = "94da20d98b2fa7688e9cbfaf7692ddb4954f7600"
+notes = "Current source compiled and realtime model contract was found. Kept in research zone because current model-card intended-use restrictions are stricter than repository license metadata alone."

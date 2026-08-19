@@ -1,0 +1,12 @@
+name: cosyvoice3-five-voices-retry2-archived
+
+on:
+  workflow_dispatch:
+
+jobs:
+  evidence-note:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Corrected CosyVoice3 qualification is retained as registry evidence and Actions artifacts."
+          echo "This historical five-voice cast is manual-only in v0.4 to prevent repeated ~10 GB checkpoint work on unrelated commits."

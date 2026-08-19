@@ -1,0 +1,12 @@
+name: cosyvoice3-five-voices-retry-archived
+
+on:
+  workflow_dispatch:
+
+jobs:
+  evidence-note:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Historical qualification workflow archived to avoid rerunning a heavyweight model on every PR synchronize."
+          echo "The exact original recipe remains in Git history; corrected CosyVoice3 evidence is recorded in registry/qualifications.toml."

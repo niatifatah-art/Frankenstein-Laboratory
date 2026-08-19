@@ -1,0 +1,54 @@
+{
+  "kind": "real_model_smoke",
+  "engine": "kokoro",
+  "engine_package_version": "0.9.4",
+  "date": "2026-08-18",
+  "source_commit": "c53b22f46e7a2f42bd7ca154f0a5fbf01e48bc96",
+  "github_actions_run_id": 32176075079,
+  "github_actions_job_id": 95838215261,
+  "artifact_id": 9339080752,
+  "artifact_name": "kokoro-smoke-audio",
+  "artifact_digest": "sha256:b8c8e626c8e2701c326113e10e448430b7e0ca4a69438d848e589fb2bdc3f1a7",
+  "environment": {
+    "os": "Ubuntu 24.04.4 LTS",
+    "runner_image": "ubuntu-24.04",
+    "runner_image_version": "20260810.271.1",
+    "python": "3.12.13",
+    "uv": "0.12.5",
+    "device_class": "GitHub-hosted CPU runner",
+    "torch_source": "https://download.pytorch.org/whl/cpu"
+  },
+  "input": {
+    "text": "Hello from Frankenstein Laboratory. This is the first real Kokoro smoke test.",
+    "voice": "af_heart",
+    "language": "a",
+    "speed": 1.0
+  },
+  "output": {
+    "sample_rate_hz": 24000,
+    "audio_duration_seconds": 5.625,
+    "wav_bytes": 270044,
+    "segments": 1
+  },
+  "timing": {
+    "model_ready_seconds": 4.695850389,
+    "time_to_first_audio_seconds": 8.378530439000002,
+    "total_generation_seconds": 8.384656585000002,
+    "real_time_factor": 1.4906056151111113
+  },
+  "validation": {
+    "synthesis_exit": "success",
+    "wav_header": "success",
+    "artifact_upload": "success"
+  },
+  "dependency_observation": {
+    "torch_download_mib": 182.9,
+    "nvidia_cuda_packages_seen": false,
+    "note": "The previous baseline pulled a 502.2 MiB PyPI torch wheel plus multiple NVIDIA/CUDA packages. Pinning the explicit CPU PyTorch index eliminated those NVIDIA/CUDA downloads in this run."
+  },
+  "observations": [
+    "This is a cold smoke run, not a subjective quality benchmark.",
+    "Timing includes model initialization and first-run setup.",
+    "Do not interpret the small timing difference versus the baseline as a performance win because the runs used different ephemeral hosts."
+  ]
+}

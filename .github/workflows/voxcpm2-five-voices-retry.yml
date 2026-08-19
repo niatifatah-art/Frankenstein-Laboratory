@@ -1,0 +1,12 @@
+name: voxcpm2-five-voices-retry-archived
+
+on:
+  workflow_dispatch:
+
+jobs:
+  evidence-note:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Historical five-voice VoxCPM2 cast archived after retained qualification evidence."
+          echo "Use voxcpm2-product-smoke for the current targeted Voice Design contract."

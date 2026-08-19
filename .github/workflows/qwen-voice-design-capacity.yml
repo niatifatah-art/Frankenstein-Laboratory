@@ -1,0 +1,58 @@
+name: qwen-voice-design-capacity
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cpu-capacity-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y sox
+      - run: python -m pip install --upgrade uv
+      - name: Attempt 1.7B VoiceDesign on hosted CPU
+        shell: bash
+        run: |
+          set +e
+          mkdir -p outputs
+          uv run --project engines/qwen3_tts python engines/qwen3_tts/runner.py \
+            --variant voice_design --device cpu --language English \
+            --max-new-tokens 96 \
+            --instruct "A calm, clear adult synthetic voice with neutral pacing." \
+            --text "Hello from the Voice Design capacity probe." \
+            --output outputs/qwen3-voice-design-17b.wav \
+            > outputs/stdout.log 2> outputs/stderr.log
+          code=$?
+          echo "$code" > outputs/exit-code.txt
+          exit 0
+      - name: Classify capacity result
+        run: |
+          python - <<'PY'
+          import json, wave
+          from pathlib import Path
+          root = Path('outputs')
+          code = int((root / 'exit-code.txt').read_text().strip())
+          wav_path = root / 'qwen3-voice-design-17b.wav'
+          result = {'engine': 'qwen3_voice_design_17b', 'exit_code': code, 'status': 'hardware_blocked'}
+          if code == 0 and wav_path.exists():
+              try:
+                  with wave.open(str(wav_path), 'rb') as wav:
+                      result.update(sample_rate=wav.getframerate(), frames=wav.getnframes())
+                      if wav.getframerate() > 0 and wav.getnframes() > 1000:
+                          result['status'] = 'passed'
+              except wave.Error as exc:
+                  result['validation_error'] = str(exc)
+          result['stderr_tail'] = (root / 'stderr.log').read_text(errors='replace')[-4000:]
+          (root / 'capacity.json').write_text(json.dumps(result, indent=2))
+          print(json.dumps(result))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qwen3-voice-design-17b-capacity
+          path: outputs/
+          if-no-files-found: error

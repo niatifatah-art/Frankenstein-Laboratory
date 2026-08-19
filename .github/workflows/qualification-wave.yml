@@ -1,0 +1,90 @@
+name: qualification-wave
+
+on:
+  workflow_dispatch:
+    inputs:
+      engine:
+        description: Engine to re-qualify
+        required: true
+        default: pocket_tts
+        type: choice
+        options:
+          - kokoro
+          - pocket_tts
+          - chatterbox_base
+          - chatterbox_nano
+          - chatterbox_turbo
+          - chatterbox_v3
+          - qwen3_custom_06b
+          - qwen3_base_06b
+          - voxcpm2
+          - melotts
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: System tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng sox
+          python -m pip install --upgrade uv
+      - name: Generate controlled reference when required
+        if: contains(fromJSON('["chatterbox_nano","chatterbox_turbo","chatterbox_v3","qwen3_base_06b"]'), inputs.engine)
+        run: |
+          mkdir -p outputs
+          uv run --project engines/kokoro python engines/kokoro/runner.py \
+            --text "This synthetic reference was generated inside Frankenstein Laboratory for controlled qualification." \
+            --output outputs/synthetic-reference.wav
+      - name: Run selected engine
+        shell: bash
+        env:
+          ENGINE: ${{ inputs.engine }}
+        run: |
+          set -euo pipefail
+          mkdir -p outputs
+          case "$ENGINE" in
+            kokoro)
+              uv run --project engines/kokoro python engines/kokoro/runner.py --text "Frankenstein Laboratory manual qualification." --output outputs/kokoro.wav | tee outputs/result.json ;;
+            pocket_tts)
+              uv run --project engines/pocket_tts python engines/pocket_tts/runner.py --text "Frankenstein Laboratory manual qualification." --output outputs/pocket.wav | tee outputs/result.json ;;
+            chatterbox_base)
+              uv run --project engines/chatterbox python engines/chatterbox/runner.py --variant base --device cpu --text "Frankenstein Laboratory manual qualification." --output outputs/chatterbox-base.wav | tee outputs/result.json ;;
+            chatterbox_nano)
+              uv run --project engines/chatterbox python engines/chatterbox/runner.py --variant nano --device cpu --reference outputs/synthetic-reference.wav --text "Frankenstein Laboratory manual qualification." --output outputs/chatterbox-nano.wav | tee outputs/result.json ;;
+            chatterbox_turbo)
+              uv run --project engines/chatterbox python engines/chatterbox/runner.py --variant turbo --device cpu --reference outputs/synthetic-reference.wav --text "Frankenstein Laboratory manual qualification." --output outputs/chatterbox-turbo.wav | tee outputs/result.json ;;
+            chatterbox_v3)
+              uv run --project engines/chatterbox python engines/chatterbox/runner.py --variant v3 --device cpu --language en --reference outputs/synthetic-reference.wav --text "Frankenstein Laboratory manual qualification." --output outputs/chatterbox-v3.wav | tee outputs/result.json ;;
+            qwen3_custom_06b)
+              uv run --project engines/qwen3_tts python engines/qwen3_tts/runner.py --variant custom --device cpu --language English --speaker Ryan --max-new-tokens 192 --text "Frankenstein Laboratory manual qualification." --output outputs/qwen3-custom.wav | tee outputs/result.json ;;
+            qwen3_base_06b)
+              uv run --project engines/qwen3_tts python engines/qwen3_tts/runner.py --variant base --device cpu --language English --reference outputs/synthetic-reference.wav --max-new-tokens 192 --text "Frankenstein Laboratory manual qualification." --output outputs/qwen3-base.wav | tee outputs/result.json ;;
+            voxcpm2)
+              uv run --project engines/voxcpm2 python engines/voxcpm2/runner.py --device cpu --steps 2 --max-len 80 --text "Frankenstein Laboratory manual qualification." --output outputs/voxcpm2.wav | tee outputs/result.json ;;
+            melotts)
+              uv run --project engines/melotts python engines/melotts/runner.py --language EN --device cpu --text "Frankenstein Laboratory manual qualification." --output outputs/melotts.wav | tee outputs/result.json ;;
+          esac
+      - name: Validate generated WAV
+        run: |
+          python - <<'PY'
+          import glob, wave
+          paths = glob.glob('outputs/*.wav')
+          generated = [p for p in paths if not p.endswith('synthetic-reference.wav')]
+          assert generated, paths
+          with wave.open(generated[-1], 'rb') as wav:
+              assert wav.getframerate() > 0
+              assert wav.getnframes() > 1000
+              print(generated[-1], wav.getframerate(), wav.getnframes())
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ inputs.engine }}-manual-qualification
+          path: outputs/
+          if-no-files-found: ignore

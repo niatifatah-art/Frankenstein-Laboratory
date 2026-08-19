@@ -1,0 +1,92 @@
+name: pocket-voice-state-smoke
+
+on:
+  pull_request:
+    paths:
+      - "src/ttslab/voice_state.py"
+      - "src/ttslab/voicepack.py"
+      - "engines/pocket_tts/export_voice.py"
+      - "engines/pocket_tts/runner.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-and-reuse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade uv && python -m pip install -e ".[dev]"
+      - name: Create a catalog-backed VoicePack
+        run: |
+          mkdir -p outputs/voicepack outputs/generated
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = {
+              'schema_version': 1,
+              'voice_id': 'ci_pocket_catalog_alba',
+              'display_name': 'CI Pocket catalog Alba',
+              'languages': ['en'],
+              'references': [],
+              'backend_states': [],
+              'style_presets': {},
+              'provenance': {
+                  'purpose': 'automated exported-state serialization test',
+                  'upstream_catalog_voice': 'alba'
+              }
+          }
+          Path('outputs/voicepack/voicepack.json').write_text(json.dumps(payload, indent=2))
+          PY
+      - name: Export reusable Pocket catalog state through OurTTS VoicePack boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          ourtts voice-state \
+            --voicepack outputs/voicepack \
+            --engine pocket_tts \
+            --language en \
+            --catalog-voice alba \
+            | tee outputs/voice-state.json
+      - name: Reuse exported state for real speech
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run --project engines/pocket_tts python engines/pocket_tts/runner.py \
+            --language english \
+            --voice outputs/voicepack/states/pocket_tts.safetensors \
+            --text "The exported Pocket voice state was loaded again successfully." \
+            --output outputs/generated/reused-state.wav \
+            | tee outputs/reuse.json
+      - name: Verify pack state, hash, provenance and PCM output
+        run: |
+          python - <<'PY'
+          import hashlib, json, wave
+          from pathlib import Path
+          root = Path('outputs/voicepack')
+          pack = json.loads((root / 'voicepack.json').read_text())
+          states = pack['backend_states']
+          assert len(states) == 1 and states[0]['engine'] == 'pocket_tts', states
+          state = root / states[0]['path']
+          assert state.exists() and state.stat().st_size > 1000
+          assert hashlib.sha256(state.read_bytes()).hexdigest() == states[0]['sha256']
+          source = pack['provenance']['backend_state_sources']['pocket_tts']
+          assert source == {'kind': 'catalog_voice', 'voice': 'alba'}, source
+          wav_path = Path('outputs/generated/reused-state.wav')
+          with wave.open(str(wav_path), 'rb') as wav:
+              assert wav.getframerate() == 24000
+              frames = wav.getnframes()
+              assert frames > 1000
+          print(json.dumps({'state_bytes': state.stat().st_size, 'frames': frames}))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pocket-v04-voicepack-state
+          path: outputs/
+          if-no-files-found: error
