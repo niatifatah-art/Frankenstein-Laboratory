@@ -11,6 +11,7 @@ from .adapter_runtime import (
     RuntimeInputs,
     adapter_args,
     adapter_supported_controls,
+    adapter_supports_reference,
     engine_requires_reference,
 )
 from .audio import inspect_wav
@@ -90,6 +91,22 @@ def _validate_engine_controls(engine: EngineRecord, controls: dict[str, Any]) ->
         )
 
 
+def _validate_reference_path(engine: EngineRecord, reference: Path | None) -> None:
+    if engine_requires_reference(engine.key) and reference is None:
+        raise ValueError(f"Engine {engine.key!r} requires a reference voice.")
+    if reference is None:
+        return
+    if not engine.supports("voice_cloning"):
+        raise ValueError(
+            f"Engine {engine.key!r} is not qualified for voice cloning; refusing to ignore reference audio."
+        )
+    if not adapter_supports_reference(engine.key):
+        raise ValueError(
+            f"Engine {engine.key!r} advertises cloning upstream, but its current OurTTS adapter "
+            "does not consume reference audio yet."
+        )
+
+
 def choose_render_engine(
     *,
     language: str | None,
@@ -104,37 +121,39 @@ def choose_render_engine(
             "Global pause control is ambiguous during rendering; use inline [[pause:320ms]] markers."
         )
 
+    required_capabilities = set(required_capabilities_for_controls(requested_controls))
+    if reference is not None:
+        required_capabilities.add("voice_cloning")
+
     if explicit_engine:
         engine = get_engine(explicit_engine)
         if not engine.runnable or engine.kind != "tts":
             raise ValueError(f"Engine {explicit_engine!r} is not a qualified runnable TTS backend.")
         if not engine.supports_language(language):
             raise ValueError(f"Engine {explicit_engine!r} does not support language {language!r}.")
-        if engine_requires_reference(engine.key) and reference is None:
-            raise ValueError(f"Engine {explicit_engine!r} requires a reference voice.")
+        _validate_reference_path(engine, reference)
         _validate_engine_controls(engine, requested_controls)
         return engine
 
     candidates = route_engines(
         RouteRequest(
             language=language,
-            require=required_capabilities_for_controls(requested_controls),
+            require=tuple(sorted(required_capabilities)),
             max_generation_rtf=max_generation_rtf,
         )
     )
     for candidate in candidates:
         engine = candidate.engine
-        if engine_requires_reference(engine.key) and reference is None:
-            continue
         try:
+            _validate_reference_path(engine, reference)
             _validate_engine_controls(engine, requested_controls)
         except ValueError:
             continue
         return engine
-    if requested_controls:
+    if reference is not None or requested_controls:
         raise ValueError(
-            "No qualified TTS backend has both the requested capabilities and a verified OurTTS "
-            "adapter mapping for all requested controls."
+            "No qualified TTS backend has both the requested capabilities and verified OurTTS "
+            "adapter mappings for the requested voice/control inputs."
         )
     raise ValueError("No qualified TTS backend satisfies the rendering request.")
 
