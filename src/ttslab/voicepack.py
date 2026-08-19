@@ -74,7 +74,7 @@ class VoicePack:
             if not name.strip():
                 raise ValueError("VoicePack style preset names must not be empty.")
             if not isinstance(controls, dict):
-                raise ValueError(f"VoicePack style preset {name!r} must contain a control mapping.")
+                raise TypeError(f"VoicePack style preset {name!r} must contain a control mapping.")
 
     @classmethod
     def load(cls, root: Path) -> VoicePack:
