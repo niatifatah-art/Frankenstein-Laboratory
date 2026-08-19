@@ -13,6 +13,8 @@ class VoiceSummary:
     languages: tuple[str, ...]
     styles: tuple[str, ...]
     ready: bool
+    references: int = 0
+    prepared_states: int = 0
     errors: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
@@ -33,7 +35,8 @@ class VoiceLibrary:
     def list(self) -> tuple[VoiceSummary, ...]:
         voices: list[VoiceSummary] = []
         seen: set[str] = set()
-        for directory in sorted((item for item in self.root.iterdir() if item.is_dir()), key=lambda p: p.name):
+        directories = sorted((item for item in self.root.iterdir() if item.is_dir()), key=lambda p: p.name)
+        for directory in directories:
             manifest = directory / "voicepack.json"
             if not manifest.is_file():
                 continue
@@ -62,6 +65,8 @@ class VoiceLibrary:
                     languages=pack.languages,
                     styles=tuple(sorted(pack.style_presets)),
                     ready=not errors and bool(pack.references or pack.backend_states),
+                    references=len(pack.references),
+                    prepared_states=len(pack.backend_states),
                     errors=tuple(errors),
                 )
             )
@@ -69,7 +74,8 @@ class VoiceLibrary:
 
     def resolve(self, voice_id: str) -> Path:
         matches: list[Path] = []
-        for directory in sorted((item for item in self.root.iterdir() if item.is_dir()), key=lambda p: p.name):
+        directories = sorted((item for item in self.root.iterdir() if item.is_dir()), key=lambda p: p.name)
+        for directory in directories:
             manifest = directory / "voicepack.json"
             if not manifest.is_file():
                 continue
