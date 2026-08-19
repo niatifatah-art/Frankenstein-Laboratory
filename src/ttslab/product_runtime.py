@@ -1,7 +1,7 @@
 """Product-facing routing and generation boundary for ourTTS.
 
 This layer keeps the public request simple while preserving the laboratory's capability,
-performance, VoicePack, and provenance truth rules underneath.
+performance, VoicePack, quality-evidence, and provenance truth rules underneath.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from typing import Any
 from .pipeline import required_capabilities_for_controls
 from .product import PRODUCT_NAME
 from .product_contract import GenerationRequest, ResolvedGeneration
+from .quality import QualityEvidence, load_quality_ledger
 from .rendering import choose_render_engine, render_text
 from .router import RouteRequest, route_engines
 from .voicepack import VoicePack
@@ -45,14 +46,8 @@ class ProductGenerationPlan:
 def _quality_rtf_limit(quality: str) -> float | None:
     if quality == "fast":
         return 1.0
-    if quality in {"auto", "local"}:
+    if quality in {"auto", "local", "best"}:
         return None
-    if quality == "best":
-        raise ValueError(
-            "quality='best' is not executable yet because ourTTS does not have a common quality "
-            "benchmark score. Use 'auto' until v0.6 quality evidence exists; refusing to label "
-            "the fastest backend as the best-sounding backend."
-        )
     raise ValueError(f"Unsupported quality mode: {quality!r}")
 
 
@@ -104,6 +99,71 @@ def _resolve_voicepack(
     return selection.path, pack.voice_id, controls, metadata
 
 
+def _required_capabilities(reference: Path | None, controls: dict[str, Any]) -> set[str]:
+    required = set(required_capabilities_for_controls(controls))
+    if reference is not None:
+        required.add("voice_cloning")
+    return required
+
+
+def _eligible_engine_keys(
+    *,
+    language: str | None,
+    reference: Path | None,
+    controls: dict[str, Any],
+) -> set[str]:
+    required = _required_capabilities(reference, controls)
+    candidates = route_engines(
+        RouteRequest(
+            language=language,
+            require=tuple(sorted(required)),
+        )
+    )
+    eligible: set[str] = set()
+    for candidate in candidates:
+        try:
+            choose_render_engine(
+                language=language,
+                explicit_engine=candidate.engine.key,
+                reference=reference,
+                max_generation_rtf=None,
+                controls=controls,
+            )
+        except ValueError:
+            continue
+        eligible.add(candidate.engine.key)
+    return eligible
+
+
+def _quality_task(reference: Path | None, controls: dict[str, Any]) -> str:
+    if reference is not None:
+        return "cloning"
+    if any(key in controls for key in ("style", "emotion", "voice_design", "nonverbal")):
+        return "expressive"
+    return "general"
+
+
+def _choose_best_engine(
+    *,
+    language: str | None,
+    reference: Path | None,
+    controls: dict[str, Any],
+    quality_ledger_path: Path | None,
+) -> tuple[str, QualityEvidence]:
+    if not language:
+        raise ValueError("Best requires an explicit language until cross-language quality is measured.")
+    eligible = _eligible_engine_keys(language=language, reference=reference, controls=controls)
+    if not eligible:
+        raise ValueError("No qualified TTS backend can execute this request before quality ranking.")
+    task = _quality_task(reference, controls)
+    evidence = load_quality_ledger(quality_ledger_path).best(
+        language=language,
+        task=task,
+        eligible_engines=eligible,
+    )
+    return evidence.engine, evidence
+
+
 def _routing_evidence(
     *,
     engine_key: str,
@@ -112,9 +172,7 @@ def _routing_evidence(
     controls: dict[str, Any],
     max_generation_rtf: float | None,
 ) -> tuple[str, ...]:
-    required = set(required_capabilities_for_controls(controls))
-    if reference is not None:
-        required.add("voice_cloning")
+    required = _required_capabilities(reference, controls)
     candidates = route_engines(
         RouteRequest(
             language=language,
@@ -132,6 +190,7 @@ def plan_generation(
     request: GenerationRequest,
     *,
     voicepack_root: Path | None = None,
+    quality_ledger_path: Path | None = None,
 ) -> ProductGenerationPlan:
     max_generation_rtf = _quality_rtf_limit(request.quality)
     reference, voice_id, controls, voicepack_metadata = _resolve_voicepack(
@@ -139,20 +198,44 @@ def plan_generation(
         voicepack_root,
     )
 
-    engine = choose_render_engine(
-        language=request.language,
-        explicit_engine=None,
-        reference=reference,
-        max_generation_rtf=max_generation_rtf,
-        controls=controls,
-    )
-    reasons = _routing_evidence(
-        engine_key=engine.key,
-        language=request.language,
-        reference=reference,
-        controls=controls,
-        max_generation_rtf=max_generation_rtf,
-    )
+    quality_evidence: QualityEvidence | None = None
+    if request.quality == "best":
+        engine_key, quality_evidence = _choose_best_engine(
+            language=request.language,
+            reference=reference,
+            controls=controls,
+            quality_ledger_path=quality_ledger_path,
+        )
+        engine = choose_render_engine(
+            language=request.language,
+            explicit_engine=engine_key,
+            reference=reference,
+            max_generation_rtf=None,
+            controls=controls,
+        )
+        reasons = (
+            f"measured Best score {quality_evidence.score:.2f}/100",
+            f"naturalness MOS {quality_evidence.naturalness_mos:.3f}",
+            f"WER {quality_evidence.wer:.4f}",
+            f"failure rate {quality_evidence.failure_rate:.4f}",
+            f"quality suite {quality_evidence.suite_version}",
+        )
+    else:
+        engine = choose_render_engine(
+            language=request.language,
+            explicit_engine=None,
+            reference=reference,
+            max_generation_rtf=max_generation_rtf,
+            controls=controls,
+        )
+        reasons = _routing_evidence(
+            engine_key=engine.key,
+            language=request.language,
+            reference=reference,
+            controls=controls,
+            max_generation_rtf=max_generation_rtf,
+        )
+
     metadata: dict[str, Any] = {
         "product": {
             "name": PRODUCT_NAME,
@@ -163,6 +246,7 @@ def plan_generation(
                 "quality_mode": request.quality,
                 "max_generation_rtf": max_generation_rtf,
                 "offline_inference_requested": request.offline,
+                "quality_evidence": quality_evidence.to_dict() if quality_evidence else None,
             },
         }
     }
@@ -184,10 +268,15 @@ def generate(
     output: Path,
     *,
     voicepack_root: Path | None = None,
+    quality_ledger_path: Path | None = None,
     manifest_path: Path | None = None,
     timeout_seconds: float = 1800.0,
 ) -> ResolvedGeneration:
-    plan = plan_generation(request, voicepack_root=voicepack_root)
+    plan = plan_generation(
+        request,
+        voicepack_root=voicepack_root,
+        quality_ledger_path=quality_ledger_path,
+    )
     output = output.resolve()
     manifest_path = (manifest_path or output.with_suffix(output.suffix + ".manifest.json")).resolve()
 
