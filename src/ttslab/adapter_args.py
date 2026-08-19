@@ -65,6 +65,10 @@ def _add_path(args: list[str], flag: str, value: Path | None) -> None:
         args.extend([flag, str(value.resolve())])
 
 
+def _looks_like_chatterbox_state(path: Path) -> bool:
+    return path.name.endswith(".conds.pt")
+
+
 def compile_adapter_args(
     engine: EngineRecord,
     *,
@@ -82,7 +86,8 @@ def compile_adapter_args(
 
     Unsupported concepts are returned rather than silently discarded. Prepared backend voice
     state is deliberately separate from raw reference audio so binary state is never passed to an
-    adapter as if it were a WAV.
+    adapter as if it were a WAV. The legacy synthesis path may still supply a VoicePack backend
+    state through ``reference``; verified Chatterbox state filenames are recognized explicitly.
     """
     key = engine.key
     args: list[str] = []
@@ -151,7 +156,10 @@ def compile_adapter_args(
             if voice:
                 unsupported.append("voice_with_reference")
             args += ["--voice", str(reference.resolve())]
-        elif key.startswith("chatterbox_") or key in {"qwen3_base_06b", "voxcpm2"}:
+        elif key.startswith("chatterbox_"):
+            flag = "--voice-state" if _looks_like_chatterbox_state(reference) else "--reference"
+            _add_path(args, flag, reference)
+        elif key in {"qwen3_base_06b", "voxcpm2"}:
             _add_path(args, "--reference", reference)
         else:
             unsupported.append("reference")
