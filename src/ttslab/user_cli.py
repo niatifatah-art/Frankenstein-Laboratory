@@ -103,7 +103,10 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
 def _cmd_voice_state(args: argparse.Namespace) -> int:
     try:
         state = export_voicepack_state(
-            args.voicepack, engine_key=args.engine, language=args.language
+            args.voicepack,
+            engine_key=args.engine,
+            language=args.language,
+            catalog_voice=args.catalog_voice,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"ourtts: {type(exc).__name__}: {exc}", file=sys.stderr)
@@ -181,11 +184,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     voice_state = sub.add_parser(
         "voice-state",
-        help="Build a reusable backend state inside a VoicePack (Pocket TTS is verified in v0.4).",
+        help="Build a reusable Pocket TTS backend state inside a VoicePack.",
     )
     voice_state.add_argument("--voicepack", type=Path, required=True)
     voice_state.add_argument("--engine", default="pocket_tts")
     voice_state.add_argument("--language")
+    voice_state.add_argument(
+        "--catalog-voice",
+        help="Export an ungated Pocket catalog identity. Omit to use a consented VoicePack reference.",
+    )
     voice_state.set_defaults(func=_cmd_voice_state)
     return parser
 

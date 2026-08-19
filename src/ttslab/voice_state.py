@@ -28,19 +28,40 @@ def export_voicepack_state(
     *,
     engine_key: str = "pocket_tts",
     language: str | None = None,
+    catalog_voice: str | None = None,
 ) -> BackendVoiceState:
-    """Build a verified reusable backend voice state without importing the backend into Core."""
+    """Build a verified reusable backend voice state without importing the backend into Core.
+
+    Pocket catalog voices can be exported without cloning access. Reference-audio export uses
+    Pocket's gated cloning model and therefore requires accepting the upstream model terms and
+    authenticating with Hugging Face in the worker environment.
+    """
     if engine_key != "pocket_tts":
         raise ValueError("v0.4 only has a verified persistent state exporter for Pocket TTS.")
     pack = VoicePack.load(root)
-    reference = next((item for item in pack.references if item.consent in _SAFE_CONSENT), None)
-    if reference is None:
-        raise ValueError("VoicePack needs an owned/licensed/consented/synthetic reference.")
-    reference_path = (root / reference.path).resolve()
-    if not reference_path.is_relative_to(root.resolve()) or not reference_path.exists():
-        raise FileNotFoundError(reference_path)
-    if reference.sha256 and sha256_file(reference_path) != reference.sha256.lower():
-        raise ValueError("VoicePack reference hash mismatch; refusing to export a stale identity state.")
+
+    source_args: list[str]
+    provenance = dict(pack.provenance)
+    if catalog_voice:
+        source_args = ["--catalog-voice", catalog_voice]
+        state_sources = dict(provenance.get("backend_state_sources", {}))
+        state_sources[engine_key] = {"kind": "catalog_voice", "voice": catalog_voice}
+        provenance["backend_state_sources"] = state_sources
+    else:
+        reference = next((item for item in pack.references if item.consent in _SAFE_CONSENT), None)
+        if reference is None:
+            raise ValueError(
+                "VoicePack needs an owned/licensed/consented/synthetic reference, or use "
+                "--catalog-voice for an upstream catalog identity."
+            )
+        reference_path = (root / reference.path).resolve()
+        if not reference_path.is_relative_to(root.resolve()) or not reference_path.exists():
+            raise FileNotFoundError(reference_path)
+        if reference.sha256 and sha256_file(reference_path) != reference.sha256.lower():
+            raise ValueError(
+                "VoicePack reference hash mismatch; refusing to export a stale identity state."
+            )
+        source_args = ["--reference", str(reference_path)]
 
     worker = get_worker("pocket_tts")
     exporter = worker.project_dir / "export_voice.py"
@@ -56,8 +77,7 @@ def export_voicepack_state(
         str(worker.project_dir),
         "python",
         str(exporter),
-        "--reference",
-        str(reference_path),
+        *source_args,
         "--output",
         str(state_path),
         "--language",
@@ -65,7 +85,19 @@ def export_voicepack_state(
     ]
     completed = subprocess.run(command, check=False, capture_output=True, text=True)
     if completed.returncode != 0:
-        raise RuntimeError(completed.stderr.strip()[-2000:] or completed.stdout.strip()[-2000:])
+        message = completed.stderr.strip()[-4000:] or completed.stdout.strip()[-4000:]
+        lowered = message.casefold()
+        if not catalog_voice and (
+            "accept the terms" in lowered or "voice cloning" in lowered and "unsupported" in lowered
+        ):
+            raise RuntimeError(
+                "Pocket TTS reference-audio voice-state export requires access to the gated voice-"
+                "cloning weights. Accept the terms for kyutai/pocket-tts on Hugging Face and "
+                "authenticate the environment (for CI, provide an authorized HF_TOKEN). "
+                "Catalog voice states can be exported without cloning access via --catalog-voice."
+            )
+        raise RuntimeError(message)
+
     payload = None
     for line in reversed(completed.stdout.splitlines()):
         if line.strip().startswith("{"):
@@ -82,6 +114,10 @@ def export_voicepack_state(
         sha256=sha256_file(state_path),
     )
     remaining = tuple(item for item in pack.backend_states if item.engine != engine_key)
-    updated = replace(pack, backend_states=(*remaining, state))
+    updated = replace(
+        pack,
+        backend_states=(*remaining, state),
+        provenance=provenance,
+    )
     updated.save(root)
     return state

@@ -16,7 +16,9 @@ def _sha256(path: Path) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Export a Pocket TTS voice state for fast reuse.")
-    parser.add_argument("--reference", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--reference", type=Path)
+    source.add_argument("--catalog-voice")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--language", default="english")
     args = parser.parse_args(argv)
@@ -26,7 +28,8 @@ def main(argv: list[str] | None = None) -> int:
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     model = TTSModel.load_model(language=args.language)
-    state = model.get_state_for_audio_prompt(str(args.reference.resolve()))
+    prompt = args.catalog_voice or str(args.reference.resolve())
+    state = model.get_state_for_audio_prompt(prompt)
     export_model_state(state, str(output))
     print(
         json.dumps(
@@ -34,6 +37,8 @@ def main(argv: list[str] | None = None) -> int:
                 "schema_version": 1,
                 "engine": "pocket_tts",
                 "language": args.language,
+                "source_kind": "catalog_voice" if args.catalog_voice else "reference_audio",
+                "source": args.catalog_voice or str(args.reference.resolve()),
                 "output_path": str(output),
                 "sha256": _sha256(output),
             }
