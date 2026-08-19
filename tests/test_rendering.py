@@ -89,6 +89,62 @@ def test_reference_requires_a_real_cloning_adapter(tmp_path: Path, monkeypatch) 
         )
 
 
+def test_prepared_state_reaches_chatterbox_without_raw_reference(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    calls = []
+    state = tmp_path / "creator.conds.pt"
+    state.write_bytes(b"prepared-state")
+
+    def fake_execute(key, *, text, output, extra_args, timeout_seconds):
+        calls.append((key, text, tuple(extra_args)))
+        _write_pcm(output)
+        return WorkerExecution(
+            command=("fake",),
+            returncode=0,
+            stdout='{"ok": true}',
+            stderr="",
+            payload={
+                "engine": "chatterbox_nano",
+                "reference": None,
+                "voice_state": str(state),
+            },
+        )
+
+    monkeypatch.setattr("ttslab.rendering.execute_worker", fake_execute)
+    manifest = render_text(
+        "hello from a cached voice",
+        tmp_path / "cached.wav",
+        language="en",
+        engine_key="chatterbox_nano",
+        voice_state=state,
+    )
+    assert calls[0][0] == "chatterbox_nano"
+    assert "--voice-state" in calls[0][2]
+    assert "--reference" not in calls[0][2]
+    assert manifest["reference"] is None
+    assert manifest["voice_state"] == str(state.resolve())
+    assert manifest["segments"][0]["worker_payload"]["reference"] is None
+
+
+def test_prepared_state_is_never_silently_ignored(tmp_path: Path, monkeypatch) -> None:
+    def should_not_run(*args, **kwargs):
+        raise AssertionError("worker must not run when prepared state cannot be consumed")
+
+    monkeypatch.setattr("ttslab.rendering.execute_worker", should_not_run)
+    state = tmp_path / "state.pt"
+    state.write_bytes(b"state")
+    with pytest.raises(ValueError, match="no verified prepared-state adapter mapping"):
+        render_text(
+            "hello",
+            tmp_path / "never.wav",
+            language="en",
+            engine_key="qwen3_base_06b",
+            voice_state=state,
+        )
+
+
 def test_verified_normalized_style_control_reaches_worker(tmp_path: Path, monkeypatch) -> None:
     calls = []
 
