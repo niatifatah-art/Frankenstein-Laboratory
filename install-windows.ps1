@@ -37,7 +37,8 @@ $OurTTSApi = Join-Path $Venv "Scripts\ourtts-api.exe"
 
 if (-not (Test-Path $VenvPython)) {
     Write-Host "Creating .venv with Python 3.12..."
-    & $Launcher.Command @($Launcher.Prefix) -m venv $Venv
+    $CreateVenvArgs = @($Launcher.Prefix) + @("-m", "venv", $Venv)
+    & $Launcher.Command @CreateVenvArgs
     if ($LASTEXITCODE -ne 0) { throw "Could not create the virtual environment." }
 } else {
     Write-Host "Using existing .venv"
