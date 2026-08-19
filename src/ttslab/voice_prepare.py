@@ -46,11 +46,11 @@ def prepare_voicepack_state(
     timeout_seconds: float = 1800.0,
     engine_args: list[str] | None = None,
 ) -> VoicePreparationResult:
-    """Prepare one backend-specific reusable voice state and register it atomically.
+    """Prepare one backend-specific reusable voice state and register it safely.
 
-    The source VoicePack/reference is verified before execution. The existing registered state is
-    left untouched if preparation fails. Prepared state remains backend/revision-specific rather
-    than being presented as a universal ourTTS speaker embedding.
+    The source reference is consent/hash verified before execution. Existing cached states are not
+    required to validate because this operation is also the repair/refresh path for a stale cache.
+    A previously registered state is restored if VoicePack metadata persistence fails.
     """
     if not supports_prepared_voice(engine_key):
         supported = ", ".join(sorted(_PREPARED_STATE_ENGINES))
@@ -60,12 +60,6 @@ def prepare_voicepack_state(
 
     root = voicepack_root.resolve()
     pack = VoicePack.load(root)
-    validation_errors = pack.validate_files(root, verify_hashes=True)
-    if validation_errors:
-        raise ValueError(
-            f"VoicePack {pack.voice_id!r} is invalid before preparation: "
-            + "; ".join(validation_errors)
-        )
     reference = pack.select_reference(root, allow_unknown_consent=False, verify_hash=True)
 
     engine = get_engine(engine_key)
@@ -78,6 +72,7 @@ def prepare_voicepack_state(
     states_root.mkdir(parents=True, exist_ok=True)
     final_path = states_root / f"{engine_key}.conds.pt"
     temporary_path = states_root / f".{engine_key}.{uuid4().hex}.tmp"
+    backup_path = states_root / f".{engine_key}.{uuid4().hex}.bak"
 
     try:
         execution = execute_worker(
@@ -107,8 +102,6 @@ def prepare_voicepack_state(
         model_revision = str(payload["upstream_revision"])
         adapter_version = str(payload["adapter_version"])
         digest = _sha256(temporary_path)
-
-        temporary_path.replace(final_path)
         relative_path = final_path.relative_to(root).as_posix()
         state = BackendVoiceState(
             engine=engine_key,
@@ -120,7 +113,20 @@ def prepare_voicepack_state(
             adapter_version=adapter_version,
         )
         updated = pack.with_backend_state(state)
-        updated.save_atomic(root)
+
+        had_previous = final_path.is_file()
+        if had_previous:
+            final_path.replace(backup_path)
+        try:
+            temporary_path.replace(final_path)
+            updated.save_atomic(root)
+        except Exception:
+            final_path.unlink(missing_ok=True)
+            if had_previous and backup_path.is_file():
+                backup_path.replace(final_path)
+            raise
+        backup_path.unlink(missing_ok=True)
+
         resolved = updated.resolve_backend_state(root, engine_key, verify_hash=True)
         if resolved is None:
             raise RuntimeError("Prepared state registration disappeared after VoicePack update.")
@@ -138,6 +144,7 @@ def prepare_voicepack_state(
         )
     finally:
         temporary_path.unlink(missing_ok=True)
+        backup_path.unlink(missing_ok=True)
 
 
 def _validate_payload(
