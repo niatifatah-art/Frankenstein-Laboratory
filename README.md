@@ -1,5 +1,5 @@
 # Frankenstein Laboratory
-
+ 
 Experimental laboratory for benchmarking, integrating, dissecting, and learning from open-source text-to-speech systems while progressively building an independent modular TTS platform.
 
 The goal is **not** to hide many models behind one UI. The laboratory exists to produce evidence: reproducible benchmarks, stable adapter contracts, licensing/provenance records, reusable text/pronunciation/prosody infrastructure, and eventually original TTS components and models.
