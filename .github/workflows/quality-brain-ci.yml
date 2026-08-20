@@ -1,0 +1,67 @@
+name: Quality Brain CI
+
+on:
+  pull_request:
+    paths:
+      - "src/ttslab/quality.py"
+      - "src/ttslab/quality_suite.py"
+      - "src/ttslab/quality_cast.py"
+      - "src/ttslab/quality_cli.py"
+      - "scripts/quality_transcribe_whisper.py"
+      - "tests/test_quality.py"
+      - "tests/test_quality_suite.py"
+      - "tests/test_quality_cast.py"
+      - "benchmarks/corpus.json"
+      - "benchmarks/quality/**"
+      - "docs/product/V09_QUALITY_BRAIN.md"
+      - "pyproject.toml"
+      - ".github/workflows/quality-brain-ci.yml"
+      - ".github/workflows/quality-cast-manual.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality-contract:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.12"]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install quality tooling
+        run: python -m pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check src tests scripts/quality_transcribe_whisper.py
+
+      - name: Quality tests
+        run: pytest tests/test_quality.py tests/test_quality_suite.py tests/test_quality_cast.py
+
+      - name: Quality CLI corpus smoke
+        run: ourtts-quality corpus --language en --task general --output quality-corpus.json
+
+      - name: Quality CLI transcript smoke
+        run: ourtts-quality score --reference "Hello reproducible world" --hypothesis "hello reproducible world"
+
+      - name: Quality CLI cast contract smoke
+        run: ourtts-quality cast --help
+
+      - name: Whisper evaluator contract smoke
+        run: python scripts/quality_transcribe_whisper.py --help
+
+      - name: Upload corpus smoke
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-brain-${{ matrix.os }}
+          path: quality-corpus.json
+          if-no-files-found: error

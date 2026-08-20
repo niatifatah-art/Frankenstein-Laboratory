@@ -1,0 +1,147 @@
+name: Quality Cast (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_cases:
+        description: "Number of shared English/general cases per engine"
+        required: true
+        default: "10"
+        type: string
+      whisper_model:
+        description: "Pinned Whisper evaluator model"
+        required: true
+        default: "turbo"
+        type: choice
+        options:
+          - turbo
+          - medium
+          - small
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+  WHISPER_REVISION: "5f86d1d86363843179951550570367b37c5d6f78"
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  HUGGING_FACE_HUB_TOKEN: ${{ secrets.HF_TOKEN }}
+
+jobs:
+  cpu-fast-english-general:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lab tooling
+        run: |
+          python -m pip install uv
+          python -m pip install -e ".[dev]"
+
+      - name: Generate the same real corpus with Kokoro and Pocket TTS
+        id: cast
+        continue-on-error: true
+        run: |
+          ourtts-quality cast \
+            --engine kokoro \
+            --engine pocket_tts \
+            --language en \
+            --task general \
+            --max-cases "${{ inputs.max_cases }}" \
+            --output-dir benchmarks/quality/cast/audio \
+            --samples benchmarks/quality/cast/samples-generated.json
+
+      - name: Install pinned official Whisper evaluator
+        run: |
+          python -m pip install "git+https://github.com/openai/whisper.git@${WHISPER_REVISION}"
+
+      - name: Transcribe generated speech with the fixed evaluator
+        id: asr
+        continue-on-error: true
+        run: |
+          python scripts/quality_transcribe_whisper.py \
+            benchmarks/quality/cast/samples-generated.json \
+            --output benchmarks/quality/cast/samples-transcribed.json \
+            --model "${{ inputs.whisper_model }}" \
+            --revision "${WHISPER_REVISION}"
+
+      - name: Aggregate objective quality evidence
+        if: always()
+        run: |
+          if [ -f benchmarks/quality/cast/samples-transcribed.json ]; then
+            ourtts-quality summarize \
+              benchmarks/quality/cast/samples-transcribed.json \
+              --output benchmarks/quality/cast/objective-summary.json
+          fi
+
+      - name: Build blinded listening packet
+        if: always()
+        run: |
+          SOURCE=benchmarks/quality/cast/samples-transcribed.json
+          if [ ! -f "$SOURCE" ]; then
+            SOURCE=benchmarks/quality/cast/samples-generated.json
+          fi
+          if [ -f "$SOURCE" ]; then
+            ourtts-quality listening-pack "$SOURCE" \
+              --output benchmarks/quality/cast/listening-public.json \
+              --mapping benchmarks/quality/cast/listening-private.json
+          fi
+
+      - name: Record evaluator provenance
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import platform
+          from pathlib import Path
+
+          payload = {
+              "schema_version": 1,
+              "tts_engines": ["kokoro", "pocket_tts"],
+              "language": "en",
+              "task": "general",
+              "max_cases": os.environ.get("INPUT_MAX_CASES"),
+              "asr": {
+                  "implementation": "openai/whisper",
+                  "revision": os.environ["WHISPER_REVISION"],
+                  "model": os.environ.get("INPUT_WHISPER_MODEL"),
+              },
+              "host": {
+                  "platform": platform.platform(),
+                  "python": platform.python_version(),
+              },
+              "hf_token_present": bool(os.environ.get("HF_TOKEN")),
+          }
+          path = Path("benchmarks/quality/cast/cast-provenance.json")
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+          PY
+        env:
+          INPUT_MAX_CASES: ${{ inputs.max_cases }}
+          INPUT_WHISPER_MODEL: ${{ inputs.whisper_model }}
+
+      - name: Upload quality cast evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-cast-kokoro-pocket-en-${{ github.run_id }}
+          path: benchmarks/quality/cast
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail after evidence retention when generation/evaluator failed
+        if: always()
+        shell: bash
+        run: |
+          echo "cast outcome: ${{ steps.cast.outcome }}"
+          echo "asr outcome:  ${{ steps.asr.outcome }}"
+          if [ "${{ steps.cast.outcome }}" != "success" ] || [ "${{ steps.asr.outcome }}" != "success" ]; then
+            exit 1
+          fi
